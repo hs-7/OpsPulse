@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { validateEnvironment } from './config/env';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -23,6 +25,7 @@ import { RedisModule } from './modules/redis/redis.module';
       envFilePath: ['.env', '../.env'],
       validate: validateEnvironment,
     }),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 30 }]),
     DatabaseModule,
     RedisModule,
     AuthModule,
@@ -38,5 +41,6 @@ import { RedisModule } from './modules/redis/redis.module';
     AIInsightsModule,
     HealthModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
