@@ -9,9 +9,11 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(withInterceptors([
-      (req, next) => {
+      (request, next) => {
         const token = localStorage.getItem('opspulse_access');
-        return next(token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req);
+        return next(token
+          ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+          : request);
       },
     ])),
   ]

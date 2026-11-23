@@ -1,0 +1,18 @@
+:host,
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, "Segoe UI", sans-serif;
+  color: #202636;
+  background: #f5f7fb;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}

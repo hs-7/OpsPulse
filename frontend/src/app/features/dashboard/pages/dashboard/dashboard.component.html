@@ -1,0 +1,101 @@
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">O</span><strong>OpsPulse</strong></div>
+    <nav>
+      <button class="nav-item active">▦ Overview</button>
+      <button class="nav-item">⌁ Webhooks</button>
+      <button class="nav-item">≡ Deliveries</button>
+      <button class="nav-item">⚠ Incidents</button>
+    </nav>
+    <button class="logout" (click)="logout()">↪ Sign out</button>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">OPERATIONS</p>
+        <h1>Overview</h1>
+      </div>
+      <div class="selectors">
+        <select [(ngModel)]="organizationId" (ngModelChange)="loadTenant()">
+          @for (organization of organizations; track organization.id) {
+            <option [value]="organization.id">{{ organization.name }}</option>
+          }
+        </select>
+        <select [(ngModel)]="projectId" (ngModelChange)="loadAll()">
+          @for (project of projects; track project.id) {
+            <option [value]="project.id">{{ project.name }}</option>
+          }
+        </select>
+      </div>
+    </header>
+
+    <section class="actions">
+      <button class="healthy" (click)="simulate('healthy')">✓ Simulate Healthy Webhook</button>
+      <button class="failing" (click)="simulate('failing')">⚠ Simulate Failing Webhook</button>
+    </section>
+
+    <section class="grid">
+      <article class="card endpoints">
+        <div class="card-head">
+          <div><p class="eyebrow">CONFIGURATION</p><h2>Webhook Endpoints</h2></div>
+          <button class="small" (click)="createEndpoint()">+ Create</button>
+        </div>
+        @for (endpoint of endpoints; track endpoint.id) {
+          <div class="endpoint-row">
+            <div class="status-dot" [class.off]="!endpoint.active"></div>
+            <div class="endpoint-info">
+              <strong>{{ endpoint.endpointUrl }}</strong>
+              <code>/api/webhooks/ingest/{{ endpoint.id }}</code>
+            </div>
+            <button class="icon" title="Copy ingestion URL" (click)="copy('/api/webhooks/ingest/' + endpoint.id)">⧉</button>
+          </div>
+        }
+        @if (!endpoints.length) { <p class="empty">No webhook endpoints configured.</p> }
+      </article>
+
+      <article class="card incidents">
+        <div class="card-head">
+          <div><p class="eyebrow">LIVE FEED</p><h2>Incident Feed</h2></div>
+          <span class="live">● LIVE</span>
+        </div>
+        @for (incident of liveIncidents; track incident.id) {
+          <button class="incident-row" (click)="selectIncident(incident)">
+            <span class="severity" [class]="incident.severity">{{ incident.severity }}</span>
+            <div><strong>{{ incident.title }}</strong><small>{{ incident.status }}</small></div>
+          </button>
+        }
+        @if (!liveIncidents.length) { <p class="empty">No incidents reported.</p> }
+      </article>
+    </section>
+
+    <section class="grid second">
+      <article class="card deliveries">
+        <div class="card-head"><div><p class="eyebrow">QUEUE</p><h2>Delivery Logs</h2></div></div>
+        <div class="table">
+          <div class="table-head"><span>Event</span><span>Status</span><span>Attempts</span><span>Response</span><span></span></div>
+          @for (delivery of deliveries; track delivery.id) {
+            <div class="table-row">
+              <span>{{ delivery.eventType }}</span>
+              <span class="delivery-status" [class.failed]="delivery.status === 'dead_letter'">{{ delivery.status }}</span>
+              <span>{{ delivery.attemptCount }}</span>
+              <span>{{ delivery.responseStatus || '—' }}</span>
+              <button class="icon" title="Replay delivery" (click)="replay(delivery)">↻</button>
+            </div>
+          }
+          @if (!deliveries.length) { <p class="empty">No deliveries yet.</p> }
+        </div>
+      </article>
+
+      <article class="card ai">
+        <div class="card-head"><div><p class="eyebrow">OPS PULSE AI</p><h2>Incident Summary</h2></div></div>
+        @if (summary) {
+          <p class="summary">{{ summary.summary }}</p>
+          <span class="mode">{{ summary.mode }}</span>
+        } @else {
+          <p class="empty">Select an incident to generate a root-cause summary.</p>
+        }
+      </article>
+    </section>
+  </main>
+</div>
