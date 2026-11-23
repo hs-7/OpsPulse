@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, boolean, timestamp, integer, jsonb, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, boolean, timestamp, integer, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -48,9 +48,11 @@ export const webhookEvents = pgTable('webhook_events', {
   eventType: varchar('event_type', { length: 255 }).notNull(),
   payload: jsonb('payload').notNull(),
   status: varchar('status', { length: 50 }).notNull().default('received'),
+  idempotencyKey: varchar('idempotency_key', { length: 255 }).notNull(),
   receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   endpointIdx: index('webhook_events_endpoint_idx').on(table.endpointId),
+  idempotencyIdx: uniqueIndex('webhook_events_endpoint_idempotency_uidx').on(table.endpointId, table.idempotencyKey),
 }));
 
 export const webhookDeliveries = pgTable('webhook_deliveries', {
@@ -59,6 +61,7 @@ export const webhookDeliveries = pgTable('webhook_deliveries', {
   attemptCount: integer('attempt_count').notNull().default(0),
   responseStatus: integer('response_status'),
   nextRetryAt: timestamp('next_retry_at', { withTimezone: true }),
+  status: varchar('status', { length: 50 }).notNull().default('pending'),
 }, (table) => ({
   eventIdx: index('webhook_deliveries_event_idx').on(table.eventId),
 }));

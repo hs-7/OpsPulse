@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import express, { Request as ExpressRequest } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -8,6 +9,14 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  app.use(express.json({
+    verify: (request: ExpressRequest & { rawBody?: Buffer }, _response, buffer) => {
+      request.rawBody = Buffer.from(buffer);
+    },
+  }));
+  app.use((request: { rawBody?: Buffer }, _response: unknown, next: () => void) => {
+    next();
+  });
   app.enableCors();
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new ResponseInterceptor());
