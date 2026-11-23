@@ -12,12 +12,16 @@ export class JwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const authorization = request.headers.authorization;
-    if (!authorization?.startsWith('Bearer ')) {
+    const queryToken = typeof request.query.access_token === 'string' ? request.query.access_token : undefined;
+    const token = authorization?.startsWith('Bearer ')
+      ? authorization.slice(7)
+      : queryToken;
+    if (!token) {
       throw new UnauthorizedException('Bearer access token required');
     }
 
     try {
-      const payload = this.jwt.verify<{ sub: string; email: string }>(authorization.slice(7));
+      const payload = this.jwt.verify<{ sub: string; email: string }>(token);
       request.user = { userId: payload.sub, email: payload.email };
       return true;
     } catch {

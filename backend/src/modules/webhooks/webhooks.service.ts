@@ -198,4 +198,22 @@ export class WebhooksService implements OnModuleInit, OnModuleDestroy {
     }, { jobId: `replay-${deliveryId}-${Date.now()}`, attempts: 5, backoff: { type: 'exponential', delay: 1000 } });
     return { replayed: true, deliveryId };
   }
+
+  async listDeliveries(organizationId: string) {
+    return this.db
+      .select({
+        id: schema.webhookDeliveries.id,
+        eventId: schema.webhookDeliveries.eventId,
+        eventType: schema.webhookEvents.eventType,
+        attemptCount: schema.webhookDeliveries.attemptCount,
+        responseStatus: schema.webhookDeliveries.responseStatus,
+        nextRetryAt: schema.webhookDeliveries.nextRetryAt,
+        status: schema.webhookDeliveries.status,
+      })
+      .from(schema.webhookDeliveries)
+      .innerJoin(schema.webhookEvents, eq(schema.webhookDeliveries.eventId, schema.webhookEvents.id))
+      .innerJoin(schema.webhookEndpoints, eq(schema.webhookEvents.endpointId, schema.webhookEndpoints.id))
+      .innerJoin(schema.projects, eq(schema.webhookEndpoints.projectId, schema.projects.id))
+      .where(eq(schema.projects.organizationId, organizationId));
+  }
 }

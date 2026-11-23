@@ -19,6 +19,13 @@ export class WebhooksController {
     return this.service.list(organizationId);
   }
 
+  @Get('organizations/:organizationId/webhooks/deliveries')
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @Roles('OWNER', 'ADMIN', 'MEMBER')
+  listDeliveries(@Param('organizationId') organizationId: string) {
+    return this.service.listDeliveries(organizationId);
+  }
+
   @Post('organizations/:organizationId/webhooks')
   @UseGuards(JwtAuthGuard, RbacGuard)
   @Roles('OWNER', 'ADMIN')
