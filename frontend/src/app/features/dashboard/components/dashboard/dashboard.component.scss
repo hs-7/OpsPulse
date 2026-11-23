@@ -1,7 +1,9 @@
 .app-dashboard__shell {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: grid;
   grid-template-columns: 220px 1fr;
+  overflow: hidden;
   background: var(--app-color-background);
 }
 
@@ -11,6 +13,7 @@
   padding: 24px 18px;
   color: #cbd5e1;
   background: #111827;
+  overflow-y: auto;
 }
 
 .app-dashboard__brand {
@@ -79,7 +82,9 @@
 
 .app-dashboard__main {
   min-width: 0;
+  min-height: 0;
   padding: 28px 34px 40px;
+  overflow-y: auto;
 }
 
 .app-dashboard__topbar {
@@ -255,11 +260,19 @@
 
 @media (max-width: 900px) {
   .app-dashboard__shell {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
     grid-template-columns: 1fr;
+    overflow: visible;
   }
 
   .app-dashboard__sidebar {
-    min-height: auto;
+    overflow: visible;
+  }
+
+  .app-dashboard__main {
+    overflow: visible;
   }
 
   .app-dashboard__grid {
