@@ -15,7 +15,9 @@ import {
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   //#region Private properties
+
   private readonly _http: HttpClient;
+
   //#endregion
 
   /**
@@ -27,13 +29,16 @@ export class ApiService {
   }
 
   //#region Public methods
+
   /**
    * Logs in with an email and password.
    * @param email User email.
    * @param password User password.
    */
   public login(email: string, password: string): Observable<AuthSession> {
-    return this.unwrap(this._http.post<ApiEnvelope<AuthSession>>('/auth/login', { email, password }));
+    return this.unwrap(
+      this._http.post<ApiEnvelope<AuthSession>>('/auth/login', { email, password }),
+    );
   }
 
   /**
@@ -43,10 +48,9 @@ export class ApiService {
    * @param password User password.
    */
   public register(name: string, email: string, password: string): Observable<AuthSession> {
-    return this.unwrap(this._http.post<ApiEnvelope<AuthSession>>(
-      '/auth/register',
-      { name, email, password },
-    ));
+    return this.unwrap(
+      this._http.post<ApiEnvelope<AuthSession>>('/auth/register', { name, email, password }),
+    );
   }
 
   public organizations(): Observable<Organization[]> {
@@ -54,15 +58,15 @@ export class ApiService {
   }
 
   public projects(organizationId: string): Observable<Project[]> {
-    return this.unwrap(this._http.get<ApiEnvelope<Project[]>>(
-      `/organizations/${organizationId}/projects`,
-    ));
+    return this.unwrap(
+      this._http.get<ApiEnvelope<Project[]>>(`/organizations/${organizationId}/projects`),
+    );
   }
 
   public webhooks(organizationId: string): Observable<WebhookEndpoint[]> {
-    return this.unwrap(this._http.get<ApiEnvelope<WebhookEndpoint[]>>(
-      `/organizations/${organizationId}/webhooks`,
-    ));
+    return this.unwrap(
+      this._http.get<ApiEnvelope<WebhookEndpoint[]>>(`/organizations/${organizationId}/webhooks`),
+    );
   }
 
   public createWebhook(
@@ -70,36 +74,47 @@ export class ApiService {
     projectId: string,
     endpointUrl: string,
   ): Observable<WebhookEndpoint> {
-    return this.unwrap(this._http.post<ApiEnvelope<WebhookEndpoint>>(
-      `/organizations/${organizationId}/webhooks`,
-      { projectId, endpointUrl },
-    ));
+    return this.unwrap(
+      this._http.post<ApiEnvelope<WebhookEndpoint>>(`/organizations/${organizationId}/webhooks`, {
+        projectId,
+        endpointUrl,
+      }),
+    );
   }
 
   public deliveries(organizationId: string): Observable<Delivery[]> {
-    return this.unwrap(this._http.get<ApiEnvelope<Delivery[]>>(
-      `/organizations/${organizationId}/webhooks/deliveries`,
-    ));
+    return this.unwrap(
+      this._http.get<ApiEnvelope<Delivery[]>>(
+        `/organizations/${organizationId}/webhooks/deliveries`,
+      ),
+    );
   }
 
-  public replay(organizationId: string, deliveryId: string): Observable<{ replayed: boolean; deliveryId: string }> {
-    return this.unwrap(this._http.post<ApiEnvelope<{ replayed: boolean; deliveryId: string }>>(
-      `/organizations/${organizationId}/webhooks/deliveries/${deliveryId}/replay`,
-      {},
-    ));
+  public replay(
+    organizationId: string,
+    deliveryId: string,
+  ): Observable<{ replayed: boolean; deliveryId: string }> {
+    return this.unwrap(
+      this._http.post<ApiEnvelope<{ replayed: boolean; deliveryId: string }>>(
+        `/organizations/${organizationId}/webhooks/deliveries/${deliveryId}/replay`,
+        {},
+      ),
+    );
   }
 
   public incidents(organizationId: string): Observable<Incident[]> {
-    return this.unwrap(this._http.get<ApiEnvelope<Incident[]>>(
-      `/organizations/${organizationId}/incidents`,
-    ));
+    return this.unwrap(
+      this._http.get<ApiEnvelope<Incident[]>>(`/organizations/${organizationId}/incidents`),
+    );
   }
 
   public summarize(organizationId: string, incidentId: string): Observable<IncidentSummary> {
-    return this.unwrap(this._http.post<ApiEnvelope<IncidentSummary>>(
-      `/organizations/${organizationId}/incidents/${incidentId}/summarize`,
-      {},
-    ));
+    return this.unwrap(
+      this._http.post<ApiEnvelope<IncidentSummary>>(
+        `/organizations/${organizationId}/incidents/${incidentId}/summarize`,
+        {},
+      ),
+    );
   }
 
   /**
@@ -134,24 +149,31 @@ export class ApiService {
           .map((byte) => byte.toString(16).padStart(2, '0'))
           .join('');
       }),
-      switchMap((signature) => this.unwrap(this._http.post<ApiEnvelope<{ accepted: boolean; duplicate: boolean; eventId: string }>>(
-        `/api/webhooks/ingest/${endpointId}`,
-        payload,
-        {
-          headers: {
-            'X-Webhook-Signature': `sha256=${signature}`,
-            'X-Idempotency-Key': idempotencyKey,
-            'X-Webhook-Event-Type': eventType,
-          },
-        },
-      ))),
+      switchMap((signature) =>
+        this.unwrap(
+          this._http.post<ApiEnvelope<{ accepted: boolean; duplicate: boolean; eventId: string }>>(
+            `/api/webhooks/ingest/${endpointId}`,
+            payload,
+            {
+              headers: {
+                'X-Webhook-Signature': `sha256=${signature}`,
+                'X-Idempotency-Key': idempotencyKey,
+                'X-Webhook-Event-Type': eventType,
+              },
+            },
+          ),
+        ),
+      ),
     );
   }
+
   //#endregion
 
   //#region Private methods
+
   private unwrap<T>(request: Observable<ApiEnvelope<T>>): Observable<T> {
     return request.pipe(map((response) => response.data));
   }
+
   //#endregion
 }

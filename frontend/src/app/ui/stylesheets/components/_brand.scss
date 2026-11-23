@@ -1,0 +1,14 @@
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-brand__mark {
+  width: 34px;
+  height: 34px;
+  display: block;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--app-color-brand);
+}

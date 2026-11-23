@@ -1,0 +1,31 @@
+.app-auth__shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(circle at 20% 10%, #e7efff, #f7f9fc 45%, #eef2f7);
+}
+
+.app-auth__card {
+  width: min(400px, 100%);
+  padding: 32px;
+}
+
+.app-auth__brand {
+  margin-bottom: 24px;
+}
+
+.app-auth__intro {
+  margin: 0 0 24px;
+}
+
+.app-auth__submit {
+  margin-top: 20px;
+}
+
+.app-auth__error {
+  padding: 8px 10px;
+  border-radius: var(--app-radius-sm);
+  color: var(--app-color-danger);
+  background: var(--app-color-danger-surface);
+}

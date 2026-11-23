@@ -1,0 +1,50 @@
+@use '../core/component-variables' as component;
+
+.app-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  color: #4b5565;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app-input,
+.app-select {
+  width: 100%;
+  min-height: component.$app-control-height;
+  padding: 0 component.$app-control-padding-inline;
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius-md);
+  color: var(--app-color-text);
+  background: var(--app-color-surface);
+  font-size: component.$app-control-font-size;
+
+  &:focus {
+    border-color: var(--app-color-brand);
+    outline: none;
+    box-shadow: component.$app-focus-ring;
+  }
+}
+
+.app-input::placeholder {
+  color: #929bab;
+}
+
+.app-input[aria-invalid='true'],
+.app-select[aria-invalid='true'] {
+  border-color: var(--app-color-danger);
+}
+
+.app-invalid-feedback {
+  display: block;
+  margin-block-start: 0.375rem;
+  color: var(--app-color-danger);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.app-select {
+  width: auto;
+  min-width: 160px;
+}

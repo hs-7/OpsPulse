@@ -1,0 +1,108 @@
+<main class="app-auth__shell">
+  <form
+    class="app-card app-card--elevated app-auth__card"
+    [formGroup]="form"
+    (ngSubmit)="submit()"
+  >
+    <div class="app-brand app-auth__brand">
+      <app-brand-mark />
+      <strong>OpsPulse</strong>
+    </div>
+    <h1>{{ registerMode() ? 'Create account' : 'Welcome back' }}</h1>
+    <p class="app-text-muted app-auth__intro">
+      {{
+        registerMode()
+          ? 'Start a demo operations workspace.'
+          : 'Sign in to your operations workspace.'
+      }}
+    </p>
+    @if (registerMode()) {
+      <label class="app-field">
+        Name
+        <input
+          id="name"
+          class="app-input"
+          formControlName="name"
+          name="name"
+          placeholder="Demo Operator"
+          [attr.aria-invalid]="hasFieldError('name') ? 'true' : null"
+          [attr.aria-describedby]="hasFieldError('name') ? 'name-error' : null"
+        />
+      </label>
+      @if (hasFieldError('name', 'required')) {
+        <small
+          id="name-error"
+          class="app-invalid-feedback"
+          >Name is required.</small
+        >
+      }
+    }
+    <label class="app-field">
+      Email
+      <input
+        id="email"
+        class="app-input"
+        formControlName="email"
+        name="email"
+        type="email"
+        placeholder="demo@opspulse.dev"
+        [attr.aria-invalid]="hasFieldError('email') ? 'true' : null"
+        [attr.aria-describedby]="hasFieldError('email') ? 'email-error' : null"
+      />
+    </label>
+    @if (hasFieldError('email')) {
+      <small
+        id="email-error"
+        class="app-invalid-feedback"
+      >
+        @if (hasFieldError('email', 'required')) {
+          Email is required.
+        } @else {
+          Enter a valid email address.
+        }
+      </small>
+    }
+    <label class="app-field">
+      Password
+      <input
+        id="password"
+        class="app-input"
+        formControlName="password"
+        name="password"
+        type="password"
+        placeholder="Minimum 10 characters"
+        [attr.aria-invalid]="hasFieldError('password') ? 'true' : null"
+        [attr.aria-describedby]="hasFieldError('password') ? 'password-error' : null"
+      />
+    </label>
+    @if (hasFieldError('password')) {
+      <small
+        id="password-error"
+        class="app-invalid-feedback"
+      >
+        @if (hasFieldError('password', 'required')) {
+          Password is required.
+        } @else {
+          Password must be at least 10 characters.
+        }
+      </small>
+    }
+    @if (error()) {
+      <p class="app-auth__error">{{ error() }}</p>
+    }
+    <button
+      class="app-btn app-btn--primary app-w-full app-auth__submit"
+      type="submit"
+      [disabled]="loading() || form.invalid"
+    >
+      {{ loading() ? 'Please wait...' : registerMode() ? 'Create account' : 'Sign in' }}
+    </button>
+    <button
+      class="app-btn app-btn--link app-w-full"
+      type="button"
+      (click)="toggleMode()"
+    >
+      {{ registerMode() ? 'Already have an account? Sign in' : 'New to OpsPulse? Create account' }}
+    </button>
+  </form>
+</main>

@@ -1,0 +1,14 @@
+@use '../core/component-variables' as component;
+
+.app-card {
+  padding: 18px;
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-color-surface);
+  box-shadow: component.$app-card-shadow;
+}
+
+.app-card--elevated {
+  border-radius: var(--app-radius-xl);
+  box-shadow: 0 20px 60px rgb(31 42 68 / 12%);
+}

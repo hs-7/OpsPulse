@@ -1,0 +1,15 @@
+.app-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-inline-center {
+  display: inline-flex;
+  align-items: center;
+}

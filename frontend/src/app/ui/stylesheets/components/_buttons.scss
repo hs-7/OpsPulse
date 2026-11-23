@@ -1,0 +1,78 @@
+@use '../core/component-variables' as component;
+
+.app-btn {
+  min-height: component.$app-control-height;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 component.$app-control-padding-inline;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius-md);
+  font-size: component.$app-control-font-size;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: component.$app-focus-ring;
+  }
+}
+
+.app-btn--primary {
+  color: #fff;
+  background: var(--app-color-brand);
+
+  &:hover:not(:disabled) {
+    background: var(--app-color-brand-hover);
+  }
+}
+
+.app-btn--success {
+  color: var(--app-color-success);
+  background: var(--app-color-success-surface);
+}
+
+.app-btn--danger {
+  color: var(--app-color-danger);
+  background: var(--app-color-danger-surface);
+}
+
+.app-btn--neutral {
+  color: var(--app-color-brand);
+  background: var(--app-color-neutral-surface);
+}
+
+.app-btn--subtle {
+  min-height: 34px;
+  padding-inline: 10px;
+  color: var(--app-color-text-muted);
+  background: #f2f4f8;
+}
+
+.app-btn--link {
+  min-height: auto;
+  padding: 8px;
+  color: var(--app-color-brand);
+  background: transparent;
+  font-weight: 500;
+}
+
+.app-btn--icon {
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  color: var(--app-color-text-muted);
+  background: #f2f4f8;
+}

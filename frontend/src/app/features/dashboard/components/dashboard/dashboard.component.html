@@ -1,0 +1,185 @@
+<div class="app-dashboard__shell">
+  <aside class="app-dashboard__sidebar">
+    <div class="app-brand app-dashboard__brand">
+      <app-brand-mark />
+      <strong>OpsPulse</strong>
+    </div>
+    <nav>
+      <button class="app-dashboard__nav-item app-dashboard__nav-item--active">▦ Overview</button>
+      <button class="app-dashboard__nav-item">⌁ Webhooks</button>
+      <button class="app-dashboard__nav-item">≡ Deliveries</button>
+      <button class="app-dashboard__nav-item">⚠ Incidents</button>
+    </nav>
+    <button
+      class="app-dashboard__logout"
+      (click)="logout()"
+    >
+      ↪ Sign out
+    </button>
+  </aside>
+
+  <main class="app-dashboard__main">
+    <header class="app-dashboard__topbar">
+      <div>
+        <p class="app-eyebrow">OPERATIONS</p>
+        <h1>Overview</h1>
+      </div>
+      <div class="app-dashboard__selectors">
+        <select
+          class="app-select"
+          [ngModel]="organizationId()"
+          (ngModelChange)="organizationId.set($event); loadTenant()"
+        >
+          @for (organization of organizations(); track organization.id) {
+            <option [value]="organization.id">{{ organization.name }}</option>
+          }
+        </select>
+        <select
+          class="app-select"
+          [ngModel]="projectId()"
+          (ngModelChange)="projectId.set($event); loadAll()"
+        >
+          @for (project of projects(); track project.id) {
+            <option [value]="project.id">{{ project.name }}</option>
+          }
+        </select>
+      </div>
+    </header>
+
+    <section class="app-dashboard__actions">
+      <button
+        class="app-btn app-btn--success"
+        (click)="simulate('healthy')"
+      >
+        ✓ Simulate Healthy Webhook
+      </button>
+      <button
+        class="app-btn app-btn--danger"
+        (click)="simulate('failing')"
+      >
+        ⚠ Simulate Failing Webhook
+      </button>
+    </section>
+
+    <section class="app-dashboard__grid">
+      <article class="app-card">
+        <div class="app-dashboard__card-head">
+          <div>
+            <p class="app-eyebrow">CONFIGURATION</p>
+            <h2>Webhook Endpoints</h2>
+          </div>
+          <button
+            class="app-btn app-btn--neutral"
+            (click)="createEndpoint()"
+          >
+            + Create
+          </button>
+        </div>
+        @for (endpoint of endpoints(); track endpoint.id) {
+          <div class="app-dashboard__endpoint-row">
+            <div
+              class="app-dashboard__status-dot"
+              [class.app-dashboard__status-dot--off]="!endpoint.active"
+            ></div>
+            <div class="app-dashboard__endpoint-info">
+              <strong>{{ endpoint.endpointUrl }}</strong>
+              <code>/api/webhooks/ingest/{{ endpoint.id }}</code>
+            </div>
+            <button
+              class="app-btn app-btn--icon"
+              title="Copy ingestion URL"
+              (click)="copy('/api/webhooks/ingest/' + endpoint.id)"
+            >
+              ⧉
+            </button>
+          </div>
+        }
+        @if (!endpoints().length) {
+          <p class="app-dashboard__empty">No webhook endpoints configured.</p>
+        }
+      </article>
+
+      <article class="app-card">
+        <div class="app-dashboard__card-head">
+          <div>
+            <p class="app-eyebrow">LIVE FEED</p>
+            <h2>Incident Feed</h2>
+          </div>
+          <span class="app-dashboard__live">● LIVE</span>
+        </div>
+        @for (incident of liveIncidents(); track incident.id) {
+          <button
+            class="app-dashboard__incident-row"
+            (click)="selectIncident(incident)"
+          >
+            <span
+              class="app-dashboard__severity"
+              [class.app-dashboard__severity--critical]="incident.severity === 'critical'"
+              >{{ incident.severity }}</span
+            >
+            <div>
+              <strong>{{ incident.title }}</strong><small>{{ incident.status }}</small>
+            </div>
+          </button>
+        }
+        @if (!liveIncidents().length) {
+          <p class="app-dashboard__empty">No incidents reported.</p>
+        }
+      </article>
+    </section>
+
+    <section class="app-dashboard__grid app-dashboard__grid--second">
+      <article class="app-card">
+        <div class="app-dashboard__card-head">
+          <div>
+            <p class="app-eyebrow">QUEUE</p>
+            <h2>Delivery Logs</h2>
+          </div>
+        </div>
+        <div class="app-dashboard__table">
+          <div class="app-dashboard__table-head">
+            <span>Event</span><span>Status</span><span>Attempts</span><span>Response</span
+            ><span></span>
+          </div>
+          @for (delivery of deliveries(); track delivery.id) {
+            <div class="app-dashboard__table-row">
+              <span>{{ delivery.eventType }}</span>
+              <span
+                [class.app-text-danger]="delivery.status === 'dead_letter'"
+                [class.app-text-success]="delivery.status !== 'dead_letter'"
+                >{{ delivery.status }}</span
+              >
+              <span>{{ delivery.attemptCount }}</span>
+              <span>{{ delivery.responseStatus || '—' }}</span>
+              <button
+                class="app-btn app-btn--icon"
+                title="Replay delivery"
+                (click)="replay(delivery)"
+              >
+                ↻
+              </button>
+            </div>
+          }
+          @if (!deliveries().length) {
+            <p class="app-dashboard__empty">No deliveries yet.</p>
+          }
+        </div>
+      </article>
+
+      <article class="app-card">
+        <div class="app-dashboard__card-head">
+          <div>
+            <p class="app-eyebrow">OPS PULSE AI</p>
+            <h2>Incident Summary</h2>
+          </div>
+        </div>
+        @if (summary(); as incidentSummary) {
+          <p class="app-dashboard__summary">{{ incidentSummary.summary }}</p>
+          <span class="app-dashboard__mode">{{ incidentSummary.mode }}</span>
+        } @else {
+          <p class="app-dashboard__empty">Select an incident to generate a root-cause summary.</p>
+        }
+      </article>
+    </section>
+  </main>
+</div>
