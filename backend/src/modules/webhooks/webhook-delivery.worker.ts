@@ -1,11 +1,12 @@
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Job, Worker } from 'bullmq';
 import { createHmac } from 'node:crypto';
 import { DRIZZLE } from '../../database/database.module';
 import * as schema from '../../database/schema';
+import { IncidentsService } from '../incidents/incidents.service';
 
 export type DeliveryJob = {
   deliveryId: string;
@@ -24,6 +25,7 @@ export class WebhookDeliveryWorker implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     @Inject(ConfigService) private readonly config: ConfigService,
+    @Inject(IncidentsService) private readonly incidents: IncidentsService,
   ) {}
 
   onModuleInit() {
@@ -140,5 +142,35 @@ export class WebhookDeliveryWorker implements OnModuleInit, OnModuleDestroy {
       attempts: job.attemptsMade,
       result: { error: error instanceof Error ? error.message : String(error), eventId: job.data.eventId },
     });
+
+    const context = await this.db
+      .select({
+        endpointId: schema.webhookEvents.endpointId,
+        organizationId: schema.projects.organizationId,
+      })
+      .from(schema.webhookEvents)
+      .innerJoin(schema.webhookEndpoints, eq(schema.webhookEvents.endpointId, schema.webhookEndpoints.id))
+      .innerJoin(schema.projects, eq(schema.webhookEndpoints.projectId, schema.projects.id))
+      .where(eq(schema.webhookEvents.id, job.data.eventId))
+      .limit(1);
+    if (!context.length) return;
+
+    const repeated = await this.db
+      .select({ id: schema.webhookDeliveries.id })
+      .from(schema.webhookDeliveries)
+      .innerJoin(schema.webhookEvents, eq(schema.webhookDeliveries.eventId, schema.webhookEvents.id))
+      .where(and(
+        eq(schema.webhookEvents.endpointId, context[0].endpointId),
+        inArray(schema.webhookDeliveries.status, ['retrying', 'dead_letter']),
+      ));
+    if (repeated.length >= 3) {
+      await this.incidents.escalateRepeatedFailure(
+        context[0].organizationId,
+        job.data.deliveryId,
+        context[0].endpointId,
+        job.data.eventId,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 }

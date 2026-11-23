@@ -6,8 +6,10 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { startObservability, stopObservability } from './common/observability';
 
 async function bootstrap(): Promise<void> {
+  startObservability();
   const app = await NestFactory.create(AppModule);
   app.use(express.json({
     verify: (request: ExpressRequest & { rawBody?: Buffer }, _response, buffer) => {
@@ -32,6 +34,10 @@ async function bootstrap(): Promise<void> {
 
   const port = app.get(ConfigService).getOrThrow<number>('PORT');
   await app.listen(port);
+  process.on('SIGTERM', async () => {
+    await app.close();
+    await stopObservability();
+  });
 }
 
 bootstrap();

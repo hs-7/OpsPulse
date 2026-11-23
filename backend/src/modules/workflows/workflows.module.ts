@@ -1,5 +1,11 @@
 import { Module } from '@nestjs/common';
 import { WorkflowsController } from './workflows.controller';
 import { WorkflowsService } from './workflows.service';
-@Module({ controllers: [WorkflowsController], providers: [WorkflowsService], exports: [WorkflowsService] })
+import { AuthModule } from '../auth/auth.module';
+@Module({
+  imports: [AuthModule],
+  controllers: [WorkflowsController],
+  providers: [WorkflowsService],
+  exports: [WorkflowsService],
+})
 export class WorkflowsModule {}
