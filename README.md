@@ -21,7 +21,7 @@ flowchart LR
 
 ## Stack
 
-- Backend: NestJS 10.4, TypeScript, Drizzle ORM
+- Backend: NestJS 12, TypeScript, Drizzle ORM
 - Frontend: Angular 21, TypeScript
 - Database: PostgreSQL 16
 - Queue/cache: Redis 7 + BullMQ
@@ -33,8 +33,10 @@ flowchart LR
 ## Prerequisites
 
 - Docker Desktop
-- Node.js 20+
+- Node.js 22.12+
 - npm
+
+NestJS CLI code generators require Node.js 22.22.3 or newer.
 
 ## Repository layout
 
