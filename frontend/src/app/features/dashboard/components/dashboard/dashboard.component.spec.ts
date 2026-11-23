@@ -7,6 +7,7 @@ import { ApiService } from '../../../../core/services/api.service';
 import { AuthSessionService } from '../../../../core/services/auth-session.service';
 import {
   Delivery,
+  Incident,
   IncidentSummary,
   Organization,
   Project,
@@ -198,6 +199,90 @@ describe('DashboardComponent', () => {
     currentProjectEndpoints.next([currentEndpoint]);
     currentProjectDeliveries.next([]);
     expect(component.endpoints()).toEqual([currentEndpoint]);
+  });
+
+  it('does not add an endpoint response to a different organization or project', () => {
+    const createEndpointResponse = new Subject<WebhookEndpoint>();
+    const component = fixture.componentInstance;
+
+    vi.stubGlobal('prompt', vi.fn().mockReturnValue('https://destination.example.com'));
+    vi.spyOn(api, 'createWebhook').mockReturnValue(createEndpointResponse);
+    component.organizationId.set('org-1');
+    component.projectId.set('project-1');
+    component.createEndpoint();
+
+    component.organizationId.set('org-2');
+    component.projectId.set('project-2');
+    createEndpointResponse.next({
+      id: 'endpoint-org-1',
+      projectId: 'project-1',
+      endpointUrl: 'https://destination.example.com',
+      active: true,
+    });
+
+    expect(component.endpoints()).toEqual([]);
+  });
+
+  it('ignores a summary response after switching organizations', () => {
+    const summaryResponse = new Subject<IncidentSummary>();
+    const component = fixture.componentInstance;
+    const incident: Incident = {
+      id: 'incident-1',
+      organizationId: 'org-1',
+      title: 'Old incident',
+      severity: 'high',
+      status: 'open',
+    };
+
+    vi.spyOn(api, 'summarize').mockReturnValue(summaryResponse);
+    vi.spyOn(api, 'projects').mockReturnValue(of([]));
+    vi.spyOn(api, 'webhooks').mockReturnValue(of([]));
+    vi.spyOn(api, 'deliveries').mockReturnValue(of([]));
+    vi.spyOn(api, 'incidents').mockReturnValue(of([]));
+    component.organizationId.set('org-1');
+    component.selectIncident(incident);
+
+    component.organizationId.set('org-2');
+    component.loadTenant();
+    summaryResponse.next({ mode: 'rule-based', summary: 'Old organization summary' });
+
+    expect(component.summary()).toBeNull();
+  });
+
+  it('keeps the most recently requested incident summary when responses arrive out of order', () => {
+    const earlierResponse = new Subject<IncidentSummary>();
+    const latestResponse = new Subject<IncidentSummary>();
+    const component = fixture.componentInstance;
+    const earlierIncident: Incident = {
+      id: 'incident-1',
+      organizationId: 'org-1',
+      title: 'Earlier incident',
+      severity: 'high',
+      status: 'open',
+    };
+    const latestIncident: Incident = {
+      id: 'incident-2',
+      organizationId: 'org-1',
+      title: 'Latest incident',
+      severity: 'critical',
+      status: 'open',
+    };
+    const latestSummary: IncidentSummary = {
+      mode: 'rule-based',
+      summary: 'Latest incident summary',
+    };
+
+    vi.spyOn(api, 'summarize').mockImplementation((_organizationId, incidentId) =>
+      incidentId === earlierIncident.id ? earlierResponse : latestResponse,
+    );
+    component.organizationId.set('org-1');
+    component.selectIncident(earlierIncident);
+    component.selectIncident(latestIncident);
+
+    latestResponse.next(latestSummary);
+    earlierResponse.next({ mode: 'rule-based', summary: 'Earlier incident summary' });
+
+    expect(component.summary()).toEqual(latestSummary);
   });
 
   it('stops refreshing when the incident stream remains unauthorized after one refresh', async () => {

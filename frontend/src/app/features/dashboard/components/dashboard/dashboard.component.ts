@@ -50,6 +50,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly _router: Router;
   private readonly _session: AuthSessionService;
   private _eventStreamController?: AbortController;
+  private _summaryRequestId: number;
 
   //#endregion
 
@@ -63,6 +64,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this._api = api;
     this._router = router;
     this._session = session;
+    this._summaryRequestId = 0;
     this.organizations = signal<Organization[]>([]);
     this.projects = signal<Project[]>([]);
     this.endpoints = signal<WebhookEndpoint[]>([]);
@@ -103,6 +105,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.endpoints.set([]);
     this.deliveries.set([]);
     this.liveIncidents.set([]);
+    this._summaryRequestId += 1;
     this.summary.set(null);
     this._eventStreamController?.abort();
     this._api.projects(organizationId).subscribe({
@@ -173,12 +176,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     this._api.createWebhook(organizationId, projectId, endpointUrl).subscribe({
       next: (endpoint) => {
-        this.endpoints.update((endpoints) => [endpoint, ...endpoints]);
+        if (this.organizationId() === organizationId && this.projectId() === projectId) {
+          this.endpoints.update((endpoints) => [endpoint, ...endpoints]);
+        }
         if (endpoint.secret) {
           sessionStorage.setItem(`endpoint_secret_${endpoint.id}`, endpoint.secret);
         }
       },
-      error: (error: unknown) => this._reportError(error, 'Could not create the webhook endpoint.'),
+      error: (error: unknown) => {
+        if (this.organizationId() === organizationId && this.projectId() === projectId) {
+          this._reportError(error, 'Could not create the webhook endpoint.');
+        }
+      },
     });
   }
 
@@ -190,6 +199,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const projectId = this.projectId();
     const organizationId = this.organizationId();
     if (!projectId || !organizationId) return;
+    const isCurrentSelection = () =>
+      this.organizationId() === organizationId && this.projectId() === projectId;
     const endpointUrl =
       type === 'healthy' ? 'https://httpbin.org/status/200' : 'http://127.0.0.1:65534/destination';
 
@@ -213,11 +224,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
             `${type}-${Date.now()}-${crypto.randomUUID()}`,
           )
           .subscribe({
-            next: () => this.loadAll(),
-            error: (error: unknown) => this._reportError(error, 'Could not send the test event.'),
+            next: () => {
+              if (isCurrentSelection()) this.loadAll();
+            },
+            error: (error: unknown) => {
+              if (isCurrentSelection()) {
+                this._reportError(error, 'Could not send the test event.');
+              }
+            },
           });
       },
-      error: (error: unknown) => this._reportError(error, 'Could not create a test endpoint.'),
+      error: (error: unknown) => {
+        if (isCurrentSelection()) {
+          this._reportError(error, 'Could not create a test endpoint.');
+        }
+      },
     });
   }
 
@@ -226,9 +247,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
    * @param delivery Delivery to replay.
    */
   public replay(delivery: Delivery): void {
-    this._api.replay(this.organizationId(), delivery.id).subscribe({
-      next: () => this.loadAll(),
-      error: (error: unknown) => this._reportError(error, 'Could not replay this delivery.'),
+    const organizationId = this.organizationId();
+    const projectId = this.projectId();
+    const isCurrentSelection = () =>
+      this.organizationId() === organizationId && this.projectId() === projectId;
+    this._api.replay(organizationId, delivery.id).subscribe({
+      next: () => {
+        if (isCurrentSelection()) this.loadAll();
+      },
+      error: (error: unknown) => {
+        if (isCurrentSelection()) {
+          this._reportError(error, 'Could not replay this delivery.');
+        }
+      },
     });
   }
 
@@ -237,10 +268,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
    * @param incident Incident to summarize.
    */
   public selectIncident(incident: Incident): void {
-    this._api.summarize(this.organizationId(), incident.id).subscribe({
-      next: (summary) => this.summary.set(summary),
-      error: (error: unknown) =>
-        this._reportError(error, 'Could not generate an incident summary.'),
+    const organizationId = this.organizationId();
+    const requestId = ++this._summaryRequestId;
+    this._api.summarize(organizationId, incident.id).subscribe({
+      next: (summary) => {
+        if (this.organizationId() === organizationId && this._summaryRequestId === requestId) {
+          this.summary.set(summary);
+        }
+      },
+      error: (error: unknown) => {
+        if (this.organizationId() === organizationId && this._summaryRequestId === requestId) {
+          this._reportError(error, 'Could not generate an incident summary.');
+        }
+      },
     });
   }
 
