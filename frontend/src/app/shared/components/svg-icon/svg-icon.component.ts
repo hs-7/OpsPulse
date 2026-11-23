@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, InputSignal, input } from '@angular/core';
 
 export const APP_ICON_NAMES = [
   'add',
@@ -33,6 +33,11 @@ export type AppIconName = (typeof APP_ICON_NAMES)[number];
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SvgIconComponent {
-  readonly name = input.required<AppIconName>();
-  readonly label = input('');
+  //#region Public properties
+
+  readonly name: InputSignal<AppIconName> = input.required<AppIconName>();
+
+  readonly label: InputSignal<string> = input('');
+
+  //#endregion
 }

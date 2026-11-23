@@ -44,6 +44,7 @@ export class LoginComponent {
    * Creates the login component.
    * @param api API service.
    * @param router Application router.
+   * @param session Authentication session service.
    */
   constructor(api: ApiService, router: Router, session: AuthSessionService) {
     this._api = api;
@@ -87,6 +88,7 @@ export class LoginComponent {
     });
   }
 
+  /** Toggles between sign-in and account-registration modes. */
   public toggleMode(): void {
     const registerMode = !this.registerMode();
     const nameControl = this.form.controls.name;
@@ -107,6 +109,7 @@ export class LoginComponent {
 
   //#region Private methods
 
+  /** Builds the typed form shared by sign-in and registration modes. */
   private _buildLoginForm(): FormGroup<LoginFormControls> {
     return new FormGroup<LoginFormControls>({
       name: new FormControl('', { nonNullable: true }),
@@ -121,6 +124,10 @@ export class LoginComponent {
     });
   }
 
+  /**
+   * Stores the authenticated session and opens the dashboard.
+   * @param session Authenticated session.
+   */
   private _storeSession(session: AuthSession): void {
     this._session.storeSession(session);
     void this._router.navigateByUrl('/app/dashboard');

@@ -3,4 +3,3 @@ node_modules/
 dist/
 coverage/
 package-lock.json
-src/app/features/auth/components/login/login.component.html

@@ -1,5 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnDestroy,
+  OnInit,
+  signal,
+  WritableSignal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -23,27 +30,53 @@ import { SvgIconComponent } from '../../../../shared/components/svg-icon/svg-ico
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardComponent implements OnInit, OnDestroy {
-  readonly organizations = signal<Organization[]>([]);
-  readonly projects = signal<Project[]>([]);
-  readonly endpoints = signal<WebhookEndpoint[]>([]);
-  readonly deliveries = signal<Delivery[]>([]);
-  readonly liveIncidents = signal<Incident[]>([]);
-  readonly organizationId = signal('');
-  readonly projectId = signal('');
-  readonly summary = signal<IncidentSummary | null>(null);
-  readonly error = signal('');
+  //#region Public properties
+
+  readonly organizations: WritableSignal<Organization[]>;
+  readonly projects: WritableSignal<Project[]>;
+  readonly endpoints: WritableSignal<WebhookEndpoint[]>;
+  readonly deliveries: WritableSignal<Delivery[]>;
+  readonly liveIncidents: WritableSignal<Incident[]>;
+  readonly organizationId: WritableSignal<string>;
+  readonly projectId: WritableSignal<string>;
+  readonly summary: WritableSignal<IncidentSummary | null>;
+  readonly error: WritableSignal<string>;
+
+  //#endregion
+
+  //#region Private properties
 
   private readonly _api: ApiService;
   private readonly _router: Router;
   private readonly _session: AuthSessionService;
   private _eventStreamController?: AbortController;
 
+  //#endregion
+
+  /**
+   * Creates the operations dashboard.
+   * @param api API service.
+   * @param router Application router.
+   * @param session Authentication session service.
+   */
   constructor(api: ApiService, router: Router, session: AuthSessionService) {
     this._api = api;
     this._router = router;
     this._session = session;
+    this.organizations = signal<Organization[]>([]);
+    this.projects = signal<Project[]>([]);
+    this.endpoints = signal<WebhookEndpoint[]>([]);
+    this.deliveries = signal<Delivery[]>([]);
+    this.liveIncidents = signal<Incident[]>([]);
+    this.organizationId = signal<string>('');
+    this.projectId = signal<string>('');
+    this.summary = signal<IncidentSummary | null>(null);
+    this.error = signal<string>('');
   }
 
+  //#region Public methods
+
+  /** Loads the organizations available to the authenticated user. */
   public ngOnInit(): void {
     if (!this._session.accessToken) {
       void this._router.navigateByUrl('/auth/login');
@@ -53,45 +86,74 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this._loadOrganizations();
   }
 
+  /** Aborts the live incident stream when the dashboard is destroyed. */
   public ngOnDestroy(): void {
     this._eventStreamController?.abort();
   }
 
+  /** Loads projects and dashboard data for the selected organization. */
   public loadTenant(): void {
     const organizationId = this.organizationId();
     if (!organizationId) return;
 
     localStorage.setItem('opspulse_organization', organizationId);
     this.error.set('');
+    this.projects.set([]);
+    this.projectId.set('');
+    this.endpoints.set([]);
+    this.deliveries.set([]);
+    this.liveIncidents.set([]);
+    this.summary.set(null);
+    this._eventStreamController?.abort();
     this._api.projects(organizationId).subscribe({
       next: (projects) => {
+        if (this.organizationId() !== organizationId) return;
         this.projects.set(projects);
         this.projectId.set(projects[0]?.id || '');
         this.loadAll();
       },
-      error: (error: unknown) =>
-        this._reportError(error, 'Could not load projects for this organization.'),
+      error: (error: unknown) => {
+        if (this.organizationId() === organizationId) {
+          this._reportError(error, 'Could not load projects for this organization.');
+        }
+      },
     });
   }
 
+  /** Refreshes dashboard resources for the current organization and project. */
   public loadAll(): void {
     const organizationId = this.organizationId();
     if (!organizationId) return;
 
     this.error.set('');
     const projectId = this.projectId() || undefined;
+    this.endpoints.set([]);
+    this.deliveries.set([]);
+    const isCurrentSelection = () =>
+      this.organizationId() === organizationId && (this.projectId() || undefined) === projectId;
     this._api.webhooks(organizationId, projectId).subscribe({
-      next: (endpoints) => this.endpoints.set(endpoints),
-      error: (error: unknown) => this._reportError(error, 'Could not load webhook endpoints.'),
+      next: (endpoints) => {
+        if (isCurrentSelection()) this.endpoints.set(endpoints);
+      },
+      error: (error: unknown) => {
+        if (isCurrentSelection()) {
+          this._reportError(error, 'Could not load webhook endpoints.');
+        }
+      },
     });
     this._api.deliveries(organizationId, projectId).subscribe({
-      next: (deliveries) => this.deliveries.set(deliveries),
-      error: (error: unknown) => this._reportError(error, 'Could not load delivery logs.'),
+      next: (deliveries) => {
+        if (isCurrentSelection()) this.deliveries.set(deliveries);
+      },
+      error: (error: unknown) => {
+        if (isCurrentSelection()) this._reportError(error, 'Could not load delivery logs.');
+      },
     });
     this._loadIncidents(organizationId);
     this._connectIncidentStream();
   }
 
+  /** Retries the organization or project load that is currently failing. */
   public retryLoad(): void {
     if (this.organizationId()) {
       this.loadTenant();
@@ -101,6 +163,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this._loadOrganizations();
   }
 
+  /** Prompts for a destination URL and creates a webhook endpoint. */
   public createEndpoint(): void {
     const projectId = this.projectId();
     const organizationId = this.organizationId();
@@ -119,6 +182,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Creates a demo endpoint and sends a healthy or failing event.
+   * @param type Simulation mode.
+   */
   public simulate(type: 'healthy' | 'failing'): void {
     const projectId = this.projectId();
     const organizationId = this.organizationId();
@@ -154,6 +221,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Requeues a delivery for another attempt.
+   * @param delivery Delivery to replay.
+   */
   public replay(delivery: Delivery): void {
     this._api.replay(this.organizationId(), delivery.id).subscribe({
       next: () => this.loadAll(),
@@ -161,6 +232,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Generates an AI summary for an incident.
+   * @param incident Incident to summarize.
+   */
   public selectIncident(incident: Incident): void {
     this._api.summarize(this.organizationId(), incident.id).subscribe({
       next: (summary) => this.summary.set(summary),
@@ -169,6 +244,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Copies an ingestion URL to the clipboard.
+   * @param value Text to copy.
+   */
   public copy(value: string): void {
     const write = navigator.clipboard?.writeText(value);
     if (!write) {
@@ -179,6 +258,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     void write.catch(() => this.error.set('Could not copy the ingestion URL.'));
   }
 
+  /** Revokes the refresh session and returns to the login page. */
   public logout(): void {
     const refreshToken = this._session.refreshToken;
     this._session.clearSession();
@@ -190,6 +270,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
     void this._router.navigateByUrl('/auth/login');
   }
 
+  //#endregion
+
+  //#region Private methods
+
+  /** Loads organizations and selects the first available organization. */
   private _loadOrganizations(): void {
     this.error.set('');
     this._api.organizations().subscribe({
@@ -202,6 +287,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Starts an authenticated, reconnecting event stream for the selected organization. */
   private _connectIncidentStream(): void {
     this._eventStreamController?.abort();
     const organizationId = this.organizationId();
@@ -212,7 +298,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
     void this._readIncidentStream(organizationId, controller.signal);
   }
 
+  /**
+   * Reads SSE messages and refreshes the incident list when an event arrives.
+   * @param organizationId Organization whose event stream is being read.
+   * @param signal Abort signal for stream cancellation.
+   */
   private async _readIncidentStream(organizationId: string, signal: AbortSignal): Promise<void> {
+    let hasRefreshedForUnauthorized = false;
+
     while (!signal.aborted) {
       try {
         const token = this._session.accessToken;
@@ -232,7 +325,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           },
         );
         if (response.status === 401) {
-          if (!this._session.refreshToken) {
+          if (hasRefreshedForUnauthorized || !this._session.refreshToken) {
             this._session.clearSession();
             void this._router.navigateByUrl('/auth/login');
             return;
@@ -240,6 +333,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
           try {
             await firstValueFrom(this._session.refreshSession());
+            hasRefreshedForUnauthorized = true;
             continue;
           } catch (error: unknown) {
             this._session.clearSession();
@@ -255,6 +349,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         const reader = response.body?.getReader();
         if (!reader) throw new Error('The incident event stream has no readable body.');
 
+        hasRefreshedForUnauthorized = false;
         const decoder = new TextDecoder();
         let buffer = '';
         while (!signal.aborted) {
@@ -279,6 +374,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Waits for the reconnect interval or an abort signal.
+   * @param signal Abort signal for stream cancellation.
+   */
   private _waitForStreamReconnect(signal: AbortSignal): Promise<void> {
     if (signal.aborted) return Promise.resolve();
 
@@ -296,13 +395,28 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Loads incidents if the requested organization is still selected.
+   * @param organizationId Organization whose incidents are loaded.
+   */
   private _loadIncidents(organizationId: string): void {
     this._api.incidents(organizationId).subscribe({
-      next: (incidents) => this.liveIncidents.set(incidents),
-      error: (error: unknown) => this._reportError(error, 'Could not load incidents.'),
+      next: (incidents) => {
+        if (this.organizationId() === organizationId) this.liveIncidents.set(incidents);
+      },
+      error: (error: unknown) => {
+        if (this.organizationId() === organizationId) {
+          this._reportError(error, 'Could not load incidents.');
+        }
+      },
     });
   }
 
+  /**
+   * Shows an API error message or a safe fallback message.
+   * @param error Error returned by the request.
+   * @param fallback Message shown when the error has no API message.
+   */
   private _reportError(error: unknown, fallback: string): void {
     if (error instanceof HttpErrorResponse) {
       const message: unknown = error.error?.message;
@@ -318,4 +432,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     this.error.set(fallback);
   }
+
+  //#endregion
 }

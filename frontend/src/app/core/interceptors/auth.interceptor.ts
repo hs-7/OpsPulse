@@ -26,18 +26,26 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
       }
 
       return session.refreshSession().pipe(
-        switchMap((refreshedSession) =>
-          next(
-            request.clone({
-              setHeaders: { Authorization: `Bearer ${refreshedSession.accessToken}` },
-            }),
-          ),
-        ),
         catchError((refreshError: unknown) => {
           session.clearSession();
           void router.navigateByUrl('/auth/login');
           return throwError(() => refreshError);
         }),
+        switchMap((refreshedSession) =>
+          next(
+            request.clone({
+              setHeaders: { Authorization: `Bearer ${refreshedSession.accessToken}` },
+            }),
+          ).pipe(
+            catchError((retryError: unknown) => {
+              if (retryError instanceof HttpErrorResponse && retryError.status === 401) {
+                session.clearSession();
+                void router.navigateByUrl('/auth/login');
+              }
+              return throwError(() => retryError);
+            }),
+          ),
+        ),
       );
     }),
   );

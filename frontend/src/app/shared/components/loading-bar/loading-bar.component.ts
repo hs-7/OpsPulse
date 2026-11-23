@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Signal } from '@angular/core';
 import { LoadingService } from '../../services/loading.service';
 
 @Component({
@@ -11,7 +11,22 @@ import { LoadingService } from '../../services/loading.service';
 export class LoadingBarComponent {
   //#region Public properties
 
-  readonly isLoading = inject(LoadingService).isLoading;
+  readonly isLoading: Signal<boolean>;
 
   //#endregion
+
+  //#region Private properties
+
+  private readonly _loading: LoadingService;
+
+  //#endregion
+
+  /**
+   * Creates the loading indicator.
+   * @param loading Shared loading state.
+   */
+  constructor(loading: LoadingService) {
+    this._loading = loading;
+    this.isLoading = this._loading.isLoading;
+  }
 }

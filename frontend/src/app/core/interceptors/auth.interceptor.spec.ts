@@ -1,7 +1,7 @@
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ApiEnvelope } from '../models/api.models';
 import { AuthSessionService } from '../services/auth-session.service';
@@ -65,5 +65,57 @@ describe('authInterceptor', () => {
     expect(results).toEqual(['loaded', 'loaded']);
     expect(session.accessToken).toBe('new-access');
     expect(session.refreshToken).toBe('rotated-refresh');
+  });
+
+  it('keeps the session when a retried request fails for a non-auth reason', () => {
+    const router = TestBed.inject(Router);
+    const navigateByUrl = vi.spyOn(router, 'navigateByUrl');
+    const errors: unknown[] = [];
+
+    http.get('/organizations/org-1/projects').subscribe({
+      error: (error: unknown) => errors.push(error),
+    });
+
+    httpTestingController
+      .expectOne('/organizations/org-1/projects')
+      .flush({ success: false, data: '' }, { status: 401, statusText: 'Unauthorized' });
+    httpTestingController.expectOne('/auth/refresh').flush({
+      success: true,
+      data: { accessToken: 'new-access', refreshToken: 'rotated-refresh' },
+    });
+    httpTestingController
+      .expectOne('/organizations/org-1/projects')
+      .flush({ success: false, data: '' }, { status: 500, statusText: 'Server Error' });
+
+    expect(errors[0]).toMatchObject({ status: 500 });
+    expect(session.accessToken).toBe('new-access');
+    expect(session.refreshToken).toBe('rotated-refresh');
+    expect(navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('clears the session when the retried request is still unauthorized', () => {
+    const router = TestBed.inject(Router);
+    const navigateByUrl = vi.spyOn(router, 'navigateByUrl');
+    const errors: unknown[] = [];
+
+    http.get('/organizations/org-1/projects').subscribe({
+      error: (error: unknown) => errors.push(error),
+    });
+
+    httpTestingController
+      .expectOne('/organizations/org-1/projects')
+      .flush({ success: false, data: '' }, { status: 401, statusText: 'Unauthorized' });
+    httpTestingController.expectOne('/auth/refresh').flush({
+      success: true,
+      data: { accessToken: 'new-access', refreshToken: 'rotated-refresh' },
+    });
+    httpTestingController
+      .expectOne('/organizations/org-1/projects')
+      .flush({ success: false, data: '' }, { status: 401, statusText: 'Unauthorized' });
+
+    expect(errors[0]).toMatchObject({ status: 401 });
+    expect(session.accessToken).toBeNull();
+    expect(session.refreshToken).toBeNull();
+    expect(navigateByUrl).toHaveBeenCalledWith('/auth/login');
   });
 });
