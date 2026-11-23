@@ -5,7 +5,10 @@
     (ngSubmit)="submit()"
   >
     <div class="app-brand app-auth__brand">
-      <app-brand-mark />
+      <app-svg-icon
+        class="app-brand__mark"
+        name="pulse"
+      />
       <strong>OpsPulse</strong>
     </div>
     <h1>{{ registerMode() ? 'Create account' : 'Welcome back' }}</h1>

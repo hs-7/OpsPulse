@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Inject, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -15,15 +15,21 @@ export class WebhooksController {
   @Get('organizations/:organizationId/webhooks')
   @UseGuards(JwtAuthGuard, RbacGuard)
   @Roles('OWNER', 'ADMIN', 'MEMBER')
-  list(@Param('organizationId') organizationId: string) {
-    return this.service.list(organizationId);
+  list(
+    @Param('organizationId') organizationId: string,
+    @Query('projectId') projectId?: string,
+  ) {
+    return this.service.list(organizationId, projectId);
   }
 
   @Get('organizations/:organizationId/webhooks/deliveries')
   @UseGuards(JwtAuthGuard, RbacGuard)
   @Roles('OWNER', 'ADMIN', 'MEMBER')
-  listDeliveries(@Param('organizationId') organizationId: string) {
-    return this.service.listDeliveries(organizationId);
+  listDeliveries(
+    @Param('organizationId') organizationId: string,
+    @Query('projectId') projectId?: string,
+  ) {
+    return this.service.listDeliveries(organizationId, projectId);
   }
 
   @Post('organizations/:organizationId/webhooks')

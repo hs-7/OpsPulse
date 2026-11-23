@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { from, map, Observable, switchMap } from 'rxjs';
 import {
@@ -63,9 +63,12 @@ export class ApiService {
     );
   }
 
-  public webhooks(organizationId: string): Observable<WebhookEndpoint[]> {
+  public webhooks(organizationId: string, projectId?: string): Observable<WebhookEndpoint[]> {
+    const params = projectId ? new HttpParams().set('projectId', projectId) : new HttpParams();
     return this.unwrap(
-      this._http.get<ApiEnvelope<WebhookEndpoint[]>>(`/organizations/${organizationId}/webhooks`),
+      this._http.get<ApiEnvelope<WebhookEndpoint[]>>(`/organizations/${organizationId}/webhooks`, {
+        params,
+      }),
     );
   }
 
@@ -82,11 +85,19 @@ export class ApiService {
     );
   }
 
-  public deliveries(organizationId: string): Observable<Delivery[]> {
+  public deliveries(organizationId: string, projectId?: string): Observable<Delivery[]> {
+    const params = projectId ? new HttpParams().set('projectId', projectId) : new HttpParams();
     return this.unwrap(
       this._http.get<ApiEnvelope<Delivery[]>>(
         `/organizations/${organizationId}/webhooks/deliveries`,
+        { params },
       ),
+    );
+  }
+
+  public logout(refreshToken: string): Observable<{ loggedOut: boolean }> {
+    return this.unwrap(
+      this._http.post<ApiEnvelope<{ loggedOut: boolean }>>('/auth/logout', { refreshToken }),
     );
   }
 

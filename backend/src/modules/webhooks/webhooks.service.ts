@@ -13,6 +13,8 @@ const createEndpointSchema = z.object({
   endpointUrl: z.string().url(),
 });
 
+const projectIdSchema = z.string().uuid();
+
 @Injectable()
 export class WebhooksService implements OnModuleInit, OnModuleDestroy {
   private queue!: Queue;
@@ -65,7 +67,14 @@ export class WebhooksService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async list(organizationId: string) {
+  async list(organizationId: string, projectId?: string) {
+    const conditions = [eq(schema.projects.organizationId, organizationId)];
+    if (projectId) {
+      const parsedProjectId = projectIdSchema.safeParse(projectId);
+      if (!parsedProjectId.success) throw new BadRequestException('Invalid projectId');
+      conditions.push(eq(schema.projects.id, parsedProjectId.data));
+    }
+
     return this.db
       .select({
         id: schema.webhookEndpoints.id,
@@ -75,7 +84,7 @@ export class WebhooksService implements OnModuleInit, OnModuleDestroy {
       })
       .from(schema.webhookEndpoints)
       .innerJoin(schema.projects, eq(schema.webhookEndpoints.projectId, schema.projects.id))
-      .where(eq(schema.projects.organizationId, organizationId));
+      .where(and(...conditions));
   }
 
   async ingest(endpointId: string, signatureHeader: string | undefined, idempotencyKey: string | undefined, eventType: string | undefined, payload: unknown) {
@@ -199,7 +208,14 @@ export class WebhooksService implements OnModuleInit, OnModuleDestroy {
     return { replayed: true, deliveryId };
   }
 
-  async listDeliveries(organizationId: string) {
+  async listDeliveries(organizationId: string, projectId?: string) {
+    const conditions = [eq(schema.projects.organizationId, organizationId)];
+    if (projectId) {
+      const parsedProjectId = projectIdSchema.safeParse(projectId);
+      if (!parsedProjectId.success) throw new BadRequestException('Invalid projectId');
+      conditions.push(eq(schema.projects.id, parsedProjectId.data));
+    }
+
     return this.db
       .select({
         id: schema.webhookDeliveries.id,
@@ -214,6 +230,6 @@ export class WebhooksService implements OnModuleInit, OnModuleDestroy {
       .innerJoin(schema.webhookEvents, eq(schema.webhookDeliveries.eventId, schema.webhookEvents.id))
       .innerJoin(schema.webhookEndpoints, eq(schema.webhookEvents.endpointId, schema.webhookEndpoints.id))
       .innerJoin(schema.projects, eq(schema.webhookEndpoints.projectId, schema.projects.id))
-      .where(eq(schema.projects.organizationId, organizationId));
+      .where(and(...conditions));
   }
 }

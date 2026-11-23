@@ -1,24 +1,56 @@
 <div class="app-dashboard__shell">
   <aside class="app-dashboard__sidebar">
     <div class="app-brand app-dashboard__brand">
-      <app-brand-mark />
+      <app-svg-icon
+        class="app-brand__mark"
+        name="pulse"
+      />
       <strong>OpsPulse</strong>
     </div>
-    <nav>
-      <button class="app-dashboard__nav-item app-dashboard__nav-item--active">▦ Overview</button>
-      <button class="app-dashboard__nav-item">⌁ Webhooks</button>
-      <button class="app-dashboard__nav-item">≡ Deliveries</button>
-      <button class="app-dashboard__nav-item">⚠ Incidents</button>
+    <nav aria-label="Primary navigation">
+      <a
+        class="app-dashboard__nav-item app-dashboard__nav-item--active"
+        href="#overview"
+        aria-current="page"
+      >
+        <app-svg-icon name="overview" />
+        Overview
+      </a>
+      <a
+        class="app-dashboard__nav-item"
+        href="#webhooks"
+      >
+        <app-svg-icon name="webhook" />
+        Webhooks
+      </a>
+      <a
+        class="app-dashboard__nav-item"
+        href="#deliveries"
+      >
+        <app-svg-icon name="delivery" />
+        Deliveries
+      </a>
+      <a
+        class="app-dashboard__nav-item"
+        href="#incidents"
+      >
+        <app-svg-icon name="incident" />
+        Incidents
+      </a>
     </nav>
     <button
       class="app-dashboard__logout"
       (click)="logout()"
     >
-      ↪ Sign out
+      <app-svg-icon name="logout" />
+      Sign out
     </button>
   </aside>
 
-  <main class="app-dashboard__main">
+  <main
+    id="overview"
+    class="app-dashboard__main"
+  >
     <header class="app-dashboard__topbar">
       <div>
         <p class="app-eyebrow">OPERATIONS</p>
@@ -29,6 +61,7 @@
           class="app-select"
           [ngModel]="organizationId()"
           (ngModelChange)="organizationId.set($event); loadTenant()"
+          aria-label="Organization"
         >
           @for (organization of organizations(); track organization.id) {
             <option [value]="organization.id">{{ organization.name }}</option>
@@ -38,6 +71,7 @@
           class="app-select"
           [ngModel]="projectId()"
           (ngModelChange)="projectId.set($event); loadAll()"
+          aria-label="Project"
         >
           @for (project of projects(); track project.id) {
             <option [value]="project.id">{{ project.name }}</option>
@@ -46,23 +80,43 @@
       </div>
     </header>
 
+    @if (error()) {
+      <div
+        class="app-dashboard__error"
+        role="alert"
+      >
+        <span>{{ error() }}</span>
+        <button
+          class="app-btn app-btn--neutral"
+          (click)="retryLoad()"
+        >
+          Retry
+        </button>
+      </div>
+    }
+
     <section class="app-dashboard__actions">
       <button
         class="app-btn app-btn--success"
         (click)="simulate('healthy')"
       >
-        ✓ Simulate Healthy Webhook
+        <app-svg-icon name="check" />
+        Simulate Healthy Webhook
       </button>
       <button
         class="app-btn app-btn--danger"
         (click)="simulate('failing')"
       >
-        ⚠ Simulate Failing Webhook
+        <app-svg-icon name="warning" />
+        Simulate Failing Webhook
       </button>
     </section>
 
     <section class="app-dashboard__grid">
-      <article class="app-card">
+      <article
+        id="webhooks"
+        class="app-card"
+      >
         <div class="app-dashboard__card-head">
           <div>
             <p class="app-eyebrow">CONFIGURATION</p>
@@ -72,7 +126,8 @@
             class="app-btn app-btn--neutral"
             (click)="createEndpoint()"
           >
-            + Create
+            <app-svg-icon name="add" />
+            Create
           </button>
         </div>
         @for (endpoint of endpoints(); track endpoint.id) {
@@ -90,7 +145,7 @@
               title="Copy ingestion URL"
               (click)="copy('/api/webhooks/ingest/' + endpoint.id)"
             >
-              ⧉
+              <app-svg-icon name="copy" />
             </button>
           </div>
         }
@@ -99,13 +154,19 @@
         }
       </article>
 
-      <article class="app-card">
+      <article
+        id="incidents"
+        class="app-card"
+      >
         <div class="app-dashboard__card-head">
           <div>
             <p class="app-eyebrow">LIVE FEED</p>
             <h2>Incident Feed</h2>
           </div>
-          <span class="app-dashboard__live">● LIVE</span>
+          <span class="app-dashboard__live">
+            <app-svg-icon name="pulse" />
+            LIVE
+          </span>
         </div>
         @for (incident of liveIncidents(); track incident.id) {
           <button
@@ -129,7 +190,10 @@
     </section>
 
     <section class="app-dashboard__grid app-dashboard__grid--second">
-      <article class="app-card">
+      <article
+        id="deliveries"
+        class="app-card"
+      >
         <div class="app-dashboard__card-head">
           <div>
             <p class="app-eyebrow">QUEUE</p>
@@ -156,7 +220,7 @@
                 title="Replay delivery"
                 (click)="replay(delivery)"
               >
-                ↻
+                <app-svg-icon name="replay" />
               </button>
             </div>
           }

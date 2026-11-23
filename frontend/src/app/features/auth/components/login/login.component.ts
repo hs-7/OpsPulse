@@ -3,7 +3,8 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { Router } from '@angular/router';
 import { AuthSession } from '../../../../core/models/api.models';
 import { ApiService } from '../../../../core/services/api.service';
-import { BrandMarkComponent } from '../../../../shared/components/brand-mark/brand-mark.component';
+import { AuthSessionService } from '../../../../core/services/auth-session.service';
+import { SvgIconComponent } from '../../../../shared/components/svg-icon/svg-icon.component';
 
 interface LoginFormControls {
   name: FormControl<string>;
@@ -16,7 +17,7 @@ type LoginFieldError = 'required' | 'email' | 'minlength';
 
 @Component({
   standalone: true,
-  imports: [BrandMarkComponent, ReactiveFormsModule],
+  imports: [ReactiveFormsModule, SvgIconComponent],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -35,6 +36,7 @@ export class LoginComponent {
 
   private readonly _api: ApiService;
   private readonly _router: Router;
+  private readonly _session: AuthSessionService;
 
   //#endregion
 
@@ -43,9 +45,10 @@ export class LoginComponent {
    * @param api API service.
    * @param router Application router.
    */
-  constructor(api: ApiService, router: Router) {
+  constructor(api: ApiService, router: Router, session: AuthSessionService) {
     this._api = api;
     this._router = router;
+    this._session = session;
     this.form = this._buildLoginForm();
     this.registerMode = signal(false);
     this.loading = signal(false);
@@ -119,8 +122,7 @@ export class LoginComponent {
   }
 
   private _storeSession(session: AuthSession): void {
-    localStorage.setItem('opspulse_access', session.accessToken);
-    localStorage.setItem('opspulse_refresh', session.refreshToken);
+    this._session.storeSession(session);
     void this._router.navigateByUrl('/app/dashboard');
   }
 

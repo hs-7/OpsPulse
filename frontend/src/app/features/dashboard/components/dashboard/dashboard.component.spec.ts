@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
 import { Organization, Project } from '../../../../core/models/api.models';
 import { DashboardComponent } from './dashboard.component';
@@ -23,7 +23,9 @@ describe('DashboardComponent', () => {
   });
 
   afterEach(() => {
+    fixture.destroy();
     localStorage.removeItem('opspulse_access');
+    localStorage.removeItem('opspulse_refresh');
     localStorage.removeItem('opspulse_organization');
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -42,6 +44,17 @@ describe('DashboardComponent', () => {
     expect(navigateByUrl).toHaveBeenCalledWith('/auth/login');
   });
 
+  it('displays organization loading failures in the dashboard', () => {
+    localStorage.setItem('opspulse_access', 'test-token');
+    vi.spyOn(api, 'organizations').mockReturnValue(throwError(() => new Error('offline')));
+
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(
+      'Could not load organizations.',
+    );
+  });
+
   it('loads the selected organization and its dashboard data', () => {
     const organization: Organization = { id: 'org-1', name: 'Acme' };
     const project: Project = {
@@ -53,11 +66,23 @@ describe('DashboardComponent', () => {
 
     localStorage.setItem('opspulse_access', 'test-token');
     vi.stubGlobal(
-      'EventSource',
-      class {
-        onmessage: ((event: MessageEvent) => void) | null = null;
-        close = vi.fn();
-      },
+      'fetch',
+      vi.fn().mockImplementation((_url, options: RequestInit) =>
+        Promise.resolve({
+          ok: true,
+          headers: { get: () => 'text/event-stream' },
+          body: {
+            getReader: () => ({
+              read: () =>
+                new Promise((resolve) =>
+                  options.signal?.addEventListener('abort', () => resolve({ done: true }), {
+                    once: true,
+                  }),
+                ),
+            }),
+          },
+        }),
+      ),
     );
     vi.spyOn(api, 'organizations').mockReturnValue(of([organization]));
     vi.spyOn(api, 'projects').mockReturnValue(of([project]));
@@ -70,8 +95,17 @@ describe('DashboardComponent', () => {
     expect(fixture.componentInstance.organizationId()).toBe(organization.id);
     expect(fixture.componentInstance.projectId()).toBe(project.id);
     expect(api.projects).toHaveBeenCalledWith(organization.id);
-    expect(api.webhooks).toHaveBeenCalledWith(organization.id);
-    expect(api.deliveries).toHaveBeenCalledWith(organization.id);
+    expect(api.webhooks).toHaveBeenCalledWith(organization.id, project.id);
+    expect(api.deliveries).toHaveBeenCalledWith(organization.id, project.id);
     expect(api.incidents).toHaveBeenCalledWith(organization.id);
+    expect(fetch).toHaveBeenCalledWith(
+      `/organizations/${organization.id}/notifications/stream`,
+      expect.objectContaining({
+        headers: {
+          Accept: 'text/event-stream',
+          Authorization: 'Bearer test-token',
+        },
+      }),
+    );
   });
 });
