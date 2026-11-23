@@ -3,7 +3,6 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
-import { ApiService } from '../../../../core/services/api.service';
 import { AuthSessionService } from '../../../../core/services/auth-session.service';
 import {
   Delivery,
@@ -14,10 +13,11 @@ import {
   WebhookEndpoint,
 } from '../../../../core/models/api.models';
 import { DashboardComponent } from './dashboard.component';
+import { DashboardApiService } from '../../data-access/dashboard-api.service';
 
 describe('DashboardComponent', () => {
   let fixture: ComponentFixture<DashboardComponent>;
-  let api: ApiService;
+  let api: DashboardApiService;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -26,7 +26,7 @@ describe('DashboardComponent', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(DashboardComponent);
-    api = TestBed.inject(ApiService);
+    api = TestBed.inject(DashboardApiService);
     localStorage.removeItem('opspulse_access');
   });
 

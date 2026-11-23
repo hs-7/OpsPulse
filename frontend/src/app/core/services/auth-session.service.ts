@@ -51,6 +51,13 @@ export class AuthSessionService {
     localStorage.removeItem('opspulse_refresh');
   }
 
+  /** Revokes a refresh token through the interceptor-free authentication client. */
+  revokeSession(refreshToken: string): Observable<{ loggedOut: boolean }> {
+    return this._http
+      .post<ApiEnvelope<{ loggedOut: boolean }>>('/auth/logout', { refreshToken })
+      .pipe(map((response) => response.data));
+  }
+
   /** Rotates the refresh token, sharing any refresh request already in flight. */
   refreshSession(): Observable<AuthSession> {
     if (!this._refreshRequest) {

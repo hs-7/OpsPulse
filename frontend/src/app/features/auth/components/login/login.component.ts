@@ -2,9 +2,9 @@ import { ChangeDetectionStrategy, Component, signal, WritableSignal } from '@ang
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthSession } from '../../../../core/models/api.models';
-import { ApiService } from '../../../../core/services/api.service';
 import { AuthSessionService } from '../../../../core/services/auth-session.service';
 import { SvgIconComponent } from '../../../../shared/components/svg-icon/svg-icon.component';
+import { AuthApiService } from '../../data-access/auth-api.service';
 
 interface LoginFormControls {
   name: FormControl<string>;
@@ -34,7 +34,7 @@ export class LoginComponent {
 
   //#region Private properties
 
-  private readonly _api: ApiService;
+  private readonly _api: AuthApiService;
   private readonly _router: Router;
   private readonly _session: AuthSessionService;
 
@@ -46,7 +46,7 @@ export class LoginComponent {
    * @param router Application router.
    * @param session Authentication session service.
    */
-  constructor(api: ApiService, router: Router, session: AuthSessionService) {
+  constructor(api: AuthApiService, router: Router, session: AuthSessionService) {
     this._api = api;
     this._router = router;
     this._session = session;

@@ -3,59 +3,32 @@ import { Injectable } from '@angular/core';
 import { from, map, Observable, switchMap } from 'rxjs';
 import {
   ApiEnvelope,
-  AuthSession,
   Delivery,
   Incident,
   IncidentSummary,
   Organization,
   Project,
   WebhookEndpoint,
-} from '../models/api.models';
+} from '../../../core/models/api.models';
 
 @Injectable({ providedIn: 'root' })
-export class ApiService {
+export class DashboardApiService {
   //#region Private properties
 
   private readonly _http: HttpClient;
 
   //#endregion
 
-  /**
-   * Creates the API client.
-   * @param http Angular HTTP client.
-   */
+  /** Creates the dashboard API client. */
   constructor(http: HttpClient) {
     this._http = http;
   }
 
   //#region Public methods
 
-  /**
-   * Logs in with an email and password.
-   * @param email User email.
-   * @param password User password.
-   */
-  public login(email: string, password: string): Observable<AuthSession> {
-    return this.unwrap(
-      this._http.post<ApiEnvelope<AuthSession>>('/auth/login', { email, password }),
-    );
-  }
-
-  /**
-   * Registers a user and creates their first organization.
-   * @param name User display name.
-   * @param email User email.
-   * @param password User password.
-   */
-  public register(name: string, email: string, password: string): Observable<AuthSession> {
-    return this.unwrap(
-      this._http.post<ApiEnvelope<AuthSession>>('/auth/register', { name, email, password }),
-    );
-  }
-
   /** Returns organizations accessible to the current user. */
   public organizations(): Observable<Organization[]> {
-    return this.unwrap(this._http.get<ApiEnvelope<Organization[]>>('/organizations'));
+    return this._unwrap(this._http.get<ApiEnvelope<Organization[]>>('/organizations'));
   }
 
   /**
@@ -63,7 +36,7 @@ export class ApiService {
    * @param organizationId Organization identifier.
    */
   public projects(organizationId: string): Observable<Project[]> {
-    return this.unwrap(
+    return this._unwrap(
       this._http.get<ApiEnvelope<Project[]>>(`/organizations/${organizationId}/projects`),
     );
   }
@@ -75,7 +48,7 @@ export class ApiService {
    */
   public webhooks(organizationId: string, projectId?: string): Observable<WebhookEndpoint[]> {
     const params = projectId ? new HttpParams().set('projectId', projectId) : new HttpParams();
-    return this.unwrap(
+    return this._unwrap(
       this._http.get<ApiEnvelope<WebhookEndpoint[]>>(`/organizations/${organizationId}/webhooks`, {
         params,
       }),
@@ -93,7 +66,7 @@ export class ApiService {
     projectId: string,
     endpointUrl: string,
   ): Observable<WebhookEndpoint> {
-    return this.unwrap(
+    return this._unwrap(
       this._http.post<ApiEnvelope<WebhookEndpoint>>(`/organizations/${organizationId}/webhooks`, {
         projectId,
         endpointUrl,
@@ -108,21 +81,11 @@ export class ApiService {
    */
   public deliveries(organizationId: string, projectId?: string): Observable<Delivery[]> {
     const params = projectId ? new HttpParams().set('projectId', projectId) : new HttpParams();
-    return this.unwrap(
+    return this._unwrap(
       this._http.get<ApiEnvelope<Delivery[]>>(
         `/organizations/${organizationId}/webhooks/deliveries`,
         { params },
       ),
-    );
-  }
-
-  /**
-   * Revokes a refresh session.
-   * @param refreshToken Refresh token to revoke.
-   */
-  public logout(refreshToken: string): Observable<{ loggedOut: boolean }> {
-    return this.unwrap(
-      this._http.post<ApiEnvelope<{ loggedOut: boolean }>>('/auth/logout', { refreshToken }),
     );
   }
 
@@ -135,7 +98,7 @@ export class ApiService {
     organizationId: string,
     deliveryId: string,
   ): Observable<{ replayed: boolean; deliveryId: string }> {
-    return this.unwrap(
+    return this._unwrap(
       this._http.post<ApiEnvelope<{ replayed: boolean; deliveryId: string }>>(
         `/organizations/${organizationId}/webhooks/deliveries/${deliveryId}/replay`,
         {},
@@ -148,7 +111,7 @@ export class ApiService {
    * @param organizationId Organization identifier.
    */
   public incidents(organizationId: string): Observable<Incident[]> {
-    return this.unwrap(
+    return this._unwrap(
       this._http.get<ApiEnvelope<Incident[]>>(`/organizations/${organizationId}/incidents`),
     );
   }
@@ -159,7 +122,7 @@ export class ApiService {
    * @param incidentId Incident identifier.
    */
   public summarize(organizationId: string, incidentId: string): Observable<IncidentSummary> {
-    return this.unwrap(
+    return this._unwrap(
       this._http.post<ApiEnvelope<IncidentSummary>>(
         `/organizations/${organizationId}/incidents/${incidentId}/summarize`,
         {},
@@ -200,7 +163,7 @@ export class ApiService {
           .join('');
       }),
       switchMap((signature) =>
-        this.unwrap(
+        this._unwrap(
           this._http.post<ApiEnvelope<{ accepted: boolean; duplicate: boolean; eventId: string }>>(
             `/api/webhooks/ingest/${endpointId}`,
             payload,
@@ -222,7 +185,7 @@ export class ApiService {
   //#region Private methods
 
   /** Extracts response data from the standard API envelope. */
-  private unwrap<T>(request: Observable<ApiEnvelope<T>>): Observable<T> {
+  private _unwrap<T>(request: Observable<ApiEnvelope<T>>): Observable<T> {
     return request.pipe(map((response) => response.data));
   }
 

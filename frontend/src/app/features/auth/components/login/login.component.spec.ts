@@ -4,9 +4,9 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { of } from 'rxjs';
-import { ApiService } from '../../../../core/services/api.service';
 import { AuthSession } from '../../../../core/models/api.models';
 import { LoginComponent } from './login.component';
+import { AuthApiService } from '../../data-access/auth-api.service';
 
 describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
@@ -35,7 +35,7 @@ describe('LoginComponent', () => {
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
     };
-    const api = TestBed.inject(ApiService);
+    const api = TestBed.inject(AuthApiService);
     const router = TestBed.inject(Router);
     const login = vi.spyOn(api, 'login').mockReturnValue(of(session));
     const navigateByUrl = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
@@ -73,7 +73,7 @@ describe('LoginComponent', () => {
   });
 
   it('does not call the API with invalid credentials', () => {
-    const api = TestBed.inject(ApiService);
+    const api = TestBed.inject(AuthApiService);
     const login = vi.spyOn(api, 'login');
     const component = fixture.componentInstance;
 

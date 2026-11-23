@@ -18,9 +18,9 @@ import {
   Project,
   WebhookEndpoint,
 } from '../../../../core/models/api.models';
-import { ApiService } from '../../../../core/services/api.service';
 import { AuthSessionService } from '../../../../core/services/auth-session.service';
 import { SvgIconComponent } from '../../../../shared/components/svg-icon/svg-icon.component';
+import { DashboardApiService } from '../../data-access/dashboard-api.service';
 
 @Component({
   standalone: true,
@@ -46,7 +46,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   //#region Private properties
 
-  private readonly _api: ApiService;
+  private readonly _api: DashboardApiService;
   private readonly _router: Router;
   private readonly _session: AuthSessionService;
   private _eventStreamController?: AbortController;
@@ -60,7 +60,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
    * @param router Application router.
    * @param session Authentication session service.
    */
-  constructor(api: ApiService, router: Router, session: AuthSessionService) {
+  constructor(api: DashboardApiService, router: Router, session: AuthSessionService) {
     this._api = api;
     this._router = router;
     this._session = session;
@@ -303,7 +303,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const refreshToken = this._session.refreshToken;
     this._session.clearSession();
     if (refreshToken) {
-      this._api.logout(refreshToken).subscribe({
+      this._session.revokeSession(refreshToken).subscribe({
         error: (error: unknown) => console.error('Could not revoke the refresh session.', error),
       });
     }

@@ -21,8 +21,8 @@ flowchart LR
 
 ## Stack
 
-- Backend: NestJS, TypeScript, Drizzle ORM
-- Frontend: Angular 19
+- Backend: NestJS 10.4, TypeScript, Drizzle ORM
+- Frontend: Angular 21, TypeScript
 - Database: PostgreSQL 16
 - Queue/cache: Redis 7 + BullMQ
 - Validation: Zod
@@ -35,6 +35,24 @@ flowchart LR
 - Docker Desktop
 - Node.js 20+
 - npm
+
+## Repository layout
+
+- `backend/src/modules/<feature>` contains feature modules, controllers, and services.
+- `backend/src/common` contains cross-cutting HTTP and observability concerns.
+- `backend/src/database` contains Drizzle schema and migration tooling.
+- `frontend/src/app/core` contains app-wide infrastructure such as auth and interceptors.
+- `frontend/src/app/features/<feature>` contains feature routes, UI, and data-access services.
+- `frontend/src/app/shared` contains reusable UI and application services.
+
+Root npm scripts delegate to the corresponding application packages:
+
+```powershell
+npm run build
+npm test
+npm run start:backend
+npm run start:frontend
+```
 
 ## Start infrastructure
 
@@ -78,14 +96,8 @@ The Angular development server proxies `/api`, `/auth`, and `/organizations` to 
 ## Tests
 
 ```powershell
-cd backend
 npm run build
 npm test
-```
-
-```powershell
-cd frontend
-npm run build
 ```
 
 ## Key API routes
