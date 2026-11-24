@@ -41,6 +41,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly projectId: WritableSignal<string>;
   readonly summary: WritableSignal<IncidentSummary | null>;
   readonly error: WritableSignal<string>;
+  readonly sidebarOpen: WritableSignal<boolean>;
 
   //#endregion
 
@@ -74,6 +75,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.projectId = signal<string>('');
     this.summary = signal<IncidentSummary | null>(null);
     this.error = signal<string>('');
+    this.sidebarOpen = signal(false);
   }
 
   //#region Public methods
@@ -164,6 +166,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
 
     this._loadOrganizations();
+  }
+
+  /** Toggles the responsive primary navigation drawer. */
+  public toggleSidebar(): void {
+    this.sidebarOpen.update((isOpen) => !isOpen);
+  }
+
+  /** Closes the responsive primary navigation drawer. */
+  public closeSidebar(): void {
+    this.sidebarOpen.set(false);
   }
 
   /** Prompts for a destination URL and creates a webhook endpoint. */

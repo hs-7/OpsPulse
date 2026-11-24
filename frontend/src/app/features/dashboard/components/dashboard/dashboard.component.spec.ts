@@ -42,6 +42,35 @@ describe('DashboardComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it('opens the responsive navigation drawer and closes it after selecting a link', () => {
+    TestBed.inject(AuthSessionService).storeSession({ accessToken: 'test-token' });
+    vi.spyOn(api, 'organizations').mockReturnValue(of([]));
+    fixture.detectChanges();
+
+    const toggle = fixture.nativeElement.querySelector(
+      '.app-dashboard__mobile-toggle',
+    ) as HTMLButtonElement;
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(
+      fixture.nativeElement
+        .querySelector('.app-dashboard__sidebar')
+        .classList.contains('app-dashboard__sidebar--open'),
+    ).toBe(true);
+
+    fixture.nativeElement.querySelector('.app-dashboard__nav-item').click();
+    fixture.detectChanges();
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(
+      fixture.nativeElement
+        .querySelector('.app-dashboard__sidebar')
+        .classList.contains('app-dashboard__sidebar--open'),
+    ).toBe(false);
+  });
+
   it('redirects to login when there is no access token', () => {
     const router = TestBed.inject(Router);
     const navigateByUrl = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
