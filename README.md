@@ -99,6 +99,9 @@ settings for plain HTTP. For a TLS-terminated deployment, set `NODE_ENV=producti
 and provide a strong `JWT_SECRET` and any required `GEMINI_API_KEY` in the
 environment before starting the stack.
 
+Object storage is not currently integrated; the runnable stack uses PostgreSQL
+and Redis.
+
 The API exposes `/health/live` and `/health/ready`; the latter checks PostgreSQL
 and Redis. The worker runs separately from API replicas. Redis Pub/Sub carries
 outbox wake-ups and incident notifications across those processes, while polling
