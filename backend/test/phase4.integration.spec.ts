@@ -1,4 +1,5 @@
 import { INestApplication, INestApplicationContext } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { createHmac } from 'node:crypto';
@@ -29,9 +30,7 @@ describe('Phase 4 webhook ingestion and delivery', () => {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   beforeAll(async () => {
-    const workerModule = await Test.createTestingModule({ imports: [WorkerModule] }).compile();
-    workerContext = workerModule.createNestApplicationContext();
-    await workerContext.init();
+    workerContext = await NestFactory.createApplicationContext(WorkerModule);
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
@@ -98,8 +97,8 @@ describe('Phase 4 webhook ingestion and delivery', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    await workerContext.close();
+    if (app) await app.close();
+    if (workerContext) await workerContext.close();
   });
 
   it('rejects an invalid HMAC signature', async () => {
