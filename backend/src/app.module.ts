@@ -17,6 +17,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AIInsightsModule } from './modules/ai-insights/ai-insights.module';
 import { HealthModule } from './modules/health/health.module';
 import { RedisModule } from './modules/redis/redis.module';
+import { ObservabilityLifecycle } from './common/observability';
 
 @Module({
   imports: [
@@ -41,6 +42,9 @@ import { RedisModule } from './modules/redis/redis.module';
     AIInsightsModule,
     HealthModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    ObservabilityLifecycle,
+  ],
 })
 export class AppModule {}

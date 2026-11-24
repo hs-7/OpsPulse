@@ -10,13 +10,15 @@ flowchart LR
   Browser -->|SSE| API
   External[External Webhook Sender] -->|HMAC Signed POST| API
   API -->|event + delivery + outbox transaction| Postgres[(PostgreSQL)]
-  Postgres -->|unpublished messages| Relay[Outbox Relay]
-  API -->|delivery replay| Redis[(Redis)]
+  API -->|wake-up publish| Redis[(Redis)]
+  Postgres -->|unpublished messages| Relay[Worker Outbox Relay]
   Relay -->|deterministic job IDs| Redis
-  Redis --> Queue[BullMQ Webhook Workers]
+  Redis --> Queue[Standalone BullMQ Worker]
   Queue --> Destination[Webhook Destination]
   Queue -->|Repeated failures| Incidents[Incident Engine]
-  Incidents --> SSE[Live Incident Feed]
+  Incidents -->|notification publish| Redis
+  Redis -->|notification subscribe| API
+  API --> SSE[Live Incident Feed]
   API --> Gemini[Gemini API Optional]
   API --> OTLP[OpenTelemetry Collector]
 ```
@@ -82,6 +84,26 @@ docker compose up -d postgres redis
 ```
 
 Postgres is available on `localhost:5432`; Redis is available on `localhost:6379`.
+
+## Run the containerized application
+
+```powershell
+docker compose up --build -d
+docker compose ps
+```
+
+The Compose stack applies database migrations before starting the API and worker.
+Open the dashboard at http://localhost:4200 and Swagger at
+http://localhost:3000/api/docs. The local Compose default uses development cookie
+settings for plain HTTP. For a TLS-terminated deployment, set `NODE_ENV=production`
+and provide a strong `JWT_SECRET` and any required `GEMINI_API_KEY` in the
+environment before starting the stack.
+
+The API exposes `/health/live` and `/health/ready`; the latter checks PostgreSQL
+and Redis. The worker runs separately from API replicas. Redis Pub/Sub carries
+outbox wake-ups and incident notifications across those processes, while polling
+continues to recover pending outbox messages. The worker health check requires
+its own renewable Redis heartbeat as well as healthy database and Redis connections.
 
 ## Backend setup
 

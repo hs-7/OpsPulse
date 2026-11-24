@@ -3,28 +3,31 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Queue } from "bullmq";
 import { randomBytes, timingSafeEqual, createHmac } from "node:crypto";
+import Redis from "ioredis";
 import { parseInput } from "../../common/validation/parse-input";
 import { DRIZZLE } from "../../database/database.module";
 import * as schema from "../../database/schema";
-import { OutboxRelayService } from "./outbox-relay.service";
 import { createEndpointSchema, projectIdSchema } from "./webhooks.schemas";
 import { WEBHOOK_DELIVERY_QUEUE } from "./webhook-delivery-queue";
 import { DeliveryJob } from "./webhook-delivery.worker";
+import { OUTBOX_RELAY_CHANNEL, REDIS } from "../redis/redis.module";
 
 @Injectable()
 export class WebhooksService {
+  private readonly logger = new Logger(WebhooksService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     @Inject(WEBHOOK_DELIVERY_QUEUE)
     private readonly queue: Queue<DeliveryJob>,
-    @Inject(OutboxRelayService)
-    private readonly outboxRelay: OutboxRelayService,
+    @Inject(REDIS) private readonly redis: Redis,
   ) {}
 
   async create(organizationId: string, input: unknown) {
@@ -205,7 +208,13 @@ export class WebhooksService {
       throw error;
     }
 
-    this.outboxRelay.notify();
+    void this.redis
+      .publish(OUTBOX_RELAY_CHANNEL, "pending")
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Outbox wake-up failed; the polling relay will retry: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
 
     return {
       accepted: true,

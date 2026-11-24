@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -22,6 +22,7 @@ export function exponentialBackoffMs(attempt: number): number {
 
 @Injectable()
 export class WebhookDeliveryWorker implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(WebhookDeliveryWorker.name);
   private worker?: Worker;
 
   constructor(
@@ -30,18 +31,24 @@ export class WebhookDeliveryWorker implements OnModuleInit, OnModuleDestroy {
     @Inject(IncidentsService) private readonly incidents: IncidentsService,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit(): Promise<void> {
     this.worker = new Worker<DeliveryJob>('webhook-deliveries', async (job) => this.process(job), {
       connection: { url: this.config.getOrThrow<string>('REDIS_URL') },
       concurrency: 5,
     });
 
-    this.worker.on('failed', async (job, error) => {
+    this.worker.on('failed', (job, error) => {
       if (!job) return;
       if (job.attemptsMade >= (job.opts.attempts || 5)) {
-        await this.handleFinalFailure(job, error);
+        void this.handleFinalFailure(job, error).catch((handlingError: unknown) => {
+          this.logger.error(
+            'Could not finalize webhook delivery failure',
+            handlingError instanceof Error ? handlingError.stack : String(handlingError),
+          );
+        });
       }
     });
+    await this.worker.waitUntilReady();
   }
 
   async onModuleDestroy() {

@@ -12,7 +12,9 @@ export class WorkflowsService {
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  list(organizationId: string) {
+  list(
+    organizationId: string,
+  ): Promise<Array<typeof schema.workflows.$inferSelect>> {
     return this.db
       .select()
       .from(schema.workflows)

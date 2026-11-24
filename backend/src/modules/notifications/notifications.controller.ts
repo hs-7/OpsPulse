@@ -15,7 +15,9 @@ export class NotificationsController {
   @Get()
   @UseGuards(RbacGuard)
   @Roles('OWNER', 'ADMIN', 'MEMBER')
-  list(@Param('organizationId') organizationId: string) {
+  list(
+    @Param('organizationId') organizationId: string,
+  ): ReturnType<NotificationsService['list']> {
     return this.service.list(organizationId);
   }
 

@@ -1,9 +1,10 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, INestApplicationContext } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { createHmac } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module';
+import { WorkerModule } from '../src/worker.module';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { DRIZZLE } from '../src/database/database.module';
 import * as schema from '../src/database/schema';
@@ -16,6 +17,7 @@ import { exponentialBackoffMs } from '../src/modules/webhooks/webhook-delivery.w
 
 describe('Phase 4 webhook ingestion and delivery', () => {
   let app: INestApplication;
+  let workerContext: INestApplicationContext;
   let accessToken: string;
   let organizationId: string;
   let projectId: string;
@@ -27,6 +29,10 @@ describe('Phase 4 webhook ingestion and delivery', () => {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   beforeAll(async () => {
+    const workerModule = await Test.createTestingModule({ imports: [WorkerModule] }).compile();
+    workerContext = workerModule.createNestApplicationContext();
+    await workerContext.init();
+
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.useGlobalInterceptors(new ResponseInterceptor());
@@ -93,6 +99,7 @@ describe('Phase 4 webhook ingestion and delivery', () => {
 
   afterAll(async () => {
     await app.close();
+    await workerContext.close();
   });
 
   it('rejects an invalid HMAC signature', async () => {
@@ -206,10 +213,10 @@ describe('Phase 4 webhook ingestion and delivery', () => {
   });
 
   it('keeps an outbox event pending when Redis rejects publishing and relays it after recovery', async () => {
-    const relay = app.get(OutboxRelayService);
+    const relay = workerContext.get(OutboxRelayService);
     await relay.relayPending();
 
-    const queue = app.get<Queue<DeliveryJob>>(WEBHOOK_DELIVERY_QUEUE);
+    const queue = workerContext.get<Queue<DeliveryJob>>(WEBHOOK_DELIVERY_QUEUE);
     let rejectQueueAdd!: (error: Error) => void;
     const redisUnavailable =
       new Promise<Awaited<ReturnType<typeof queue.add>>>((_, reject) => {

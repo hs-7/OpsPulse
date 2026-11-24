@@ -1,4 +1,4 @@
-import { Provider } from "@nestjs/common";
+import { Inject, Injectable, OnModuleDestroy, Provider } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Queue } from "bullmq";
 import { DeliveryJob } from "./webhook-delivery.worker";
@@ -21,3 +21,15 @@ export const webhookDeliveryQueueProvider: Provider = {
       },
     }),
 };
+
+@Injectable()
+export class WebhookDeliveryQueueLifecycle implements OnModuleDestroy {
+  constructor(
+    @Inject(WEBHOOK_DELIVERY_QUEUE)
+    private readonly queue: Queue<DeliveryJob>,
+  ) {}
+
+  async onModuleDestroy(): Promise<void> {
+    await this.queue.close();
+  }
+}

@@ -1,6 +1,7 @@
 import { trace } from '@opentelemetry/api';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { NodeSDK } from '@opentelemetry/sdk-node';
+import { Injectable, OnApplicationShutdown } from '@nestjs/common';
 
 export class StructuredLogger {
   log(level: 'info' | 'warn' | 'error', message: string, fields: Record<string, unknown> = {}): void {
@@ -33,4 +34,11 @@ export function startObservability(): NodeSDK | undefined {
 export async function stopObservability(): Promise<void> {
   await sdk?.shutdown();
   sdk = undefined;
+}
+
+@Injectable()
+export class ObservabilityLifecycle implements OnApplicationShutdown {
+  async onApplicationShutdown(): Promise<void> {
+    await stopObservability();
+  }
 }

@@ -61,7 +61,7 @@ export class IncidentsService {
       "incident",
       incident.id,
     );
-    this.publish(organizationId, incident.id, incident.title);
+    await this.publish(organizationId, incident.id, incident.title);
     return incident;
   }
 
@@ -90,7 +90,7 @@ export class IncidentsService {
       "incident",
       incident.id,
     );
-    this.publish(organizationId, incident.id, incident.title);
+    await this.publish(organizationId, incident.id, incident.title);
     return incident;
   }
 
@@ -171,7 +171,7 @@ export class IncidentsService {
       "incident",
       incident.id,
     );
-    this.publish(organizationId, incident.id, incident.title);
+    await this.publish(organizationId, incident.id, incident.title);
     void this.ai.summarize({
       organizationId,
       title: incident.title,
@@ -181,12 +181,12 @@ export class IncidentsService {
     return incident;
   }
 
-  private publish(
+  private async publish(
     organizationId: string,
     resourceId: string,
     title: string,
-  ): void {
-    this.notifications.publish({
+  ): Promise<void> {
+    await this.notifications.publish({
       organizationId,
       type: "incident",
       resourceType: "incident",

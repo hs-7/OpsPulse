@@ -14,7 +14,11 @@ export class WorkflowsController {
   @Get()
   @UseGuards(RbacGuard)
   @Roles('OWNER', 'ADMIN', 'MEMBER')
-  list(@Param('organizationId') organizationId: string) { return this.service.list(organizationId); }
+  list(
+    @Param('organizationId') organizationId: string,
+  ): ReturnType<WorkflowsService['list']> {
+    return this.service.list(organizationId);
+  }
 
   @Post()
   @UseGuards(RbacGuard)

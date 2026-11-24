@@ -8,9 +8,11 @@ import {
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Queue } from "bullmq";
+import Redis from "ioredis";
 import { z } from "zod";
 import { DRIZZLE } from "../../database/database.module";
 import * as schema from "../../database/schema";
+import { OUTBOX_RELAY_CHANNEL, REDIS_SUBSCRIBER } from "../redis/redis.module";
 import { DeliveryJob } from "./webhook-delivery.worker";
 import { WEBHOOK_DELIVERY_QUEUE } from "./webhook-delivery-queue";
 
@@ -28,20 +30,29 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
   private readonly _logger = new Logger(OutboxRelayService.name);
   private _pollTimer?: NodeJS.Timeout;
   private _relayPromise?: Promise<number>;
+  private _isShuttingDown = false;
+  private readonly _handleMessage = (channel: string): void => {
+    if (channel === OUTBOX_RELAY_CHANNEL) this._wake();
+  };
 
   constructor(
     @Inject(DRIZZLE) private readonly _db: NodePgDatabase<typeof schema>,
     @Inject(WEBHOOK_DELIVERY_QUEUE)
     private readonly _queue: Queue<DeliveryJob>,
+    @Inject(REDIS_SUBSCRIBER) private readonly _subscriber: Redis,
   ) {}
 
-  public onModuleInit(): void {
+  public async onModuleInit(): Promise<void> {
+    this._subscriber.on("message", this._handleMessage);
+    await this._subscriber.subscribe(OUTBOX_RELAY_CHANNEL);
     this._pollTimer = setInterval(() => this._wake(), pollIntervalMs);
     this._pollTimer.unref();
     this._wake();
   }
 
   public async onModuleDestroy(): Promise<void> {
+    this._isShuttingDown = true;
+    this._subscriber.removeListener("message", this._handleMessage);
     if (this._pollTimer) clearInterval(this._pollTimer);
     if (this._relayPromise) {
       try {
@@ -50,7 +61,6 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
         this._logRelayError(error);
       }
     }
-    await this._queue.close();
   }
 
   /** Schedules an immediate, non-blocking attempt to publish pending webhook events. */
@@ -70,6 +80,7 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
   }
 
   private _wake(): void {
+    if (this._isShuttingDown) return;
     void this.relayPending().catch((error: unknown) => this._logRelayError(error));
   }
 
