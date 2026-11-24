@@ -223,6 +223,41 @@ describe('DashboardComponent', () => {
     expect(component.endpoints()).toEqual([]);
   });
 
+  it('sends three failing demo events to one endpoint to trigger escalation', () => {
+    const component = fixture.componentInstance;
+    const endpoint: WebhookEndpoint = {
+      id: 'failing-demo-endpoint',
+      projectId: 'project-1',
+      endpointUrl: 'http://127.0.0.1:65534/destination',
+      secret: 'demo-secret',
+      active: true,
+    };
+
+    vi.spyOn(api, 'createWebhook').mockReturnValue(of(endpoint));
+    vi.spyOn(api, 'ingest').mockReturnValue(
+      of({ accepted: true, duplicate: false, eventId: 'demo-event' }),
+    );
+    vi.spyOn(api, 'webhooks').mockReturnValue(of([]));
+    vi.spyOn(api, 'deliveries').mockReturnValue(of([]));
+    vi.spyOn(api, 'incidents').mockReturnValue(of([]));
+    component.organizationId.set('org-1');
+    component.projectId.set('project-1');
+
+    component.simulate('failing');
+
+    expect(api.createWebhook).toHaveBeenCalledTimes(1);
+    expect(api.ingest).toHaveBeenCalledTimes(3);
+    const calls = vi.mocked(api.ingest).mock.calls;
+    expect(calls.map((call) => call[0])).toEqual(Array(3).fill(endpoint.id));
+    expect(calls.map((call) => call[2])).toEqual(Array(3).fill('demo.failure.check'));
+    expect(calls.map((call) => call[3])).toEqual([
+      expect.objectContaining({ sequence: 1 }),
+      expect.objectContaining({ sequence: 2 }),
+      expect.objectContaining({ sequence: 3 }),
+    ]);
+    expect(new Set(calls.map((call) => call[4])).size).toBe(3);
+  });
+
   it('ignores a summary response after switching organizations', () => {
     const summaryResponse = new Subject<IncidentSummary>();
     const component = fixture.componentInstance;

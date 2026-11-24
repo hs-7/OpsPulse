@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
+import { concatMap, firstValueFrom, from } from 'rxjs';
 import {
   Delivery,
   Incident,
@@ -215,16 +215,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
                 error: 'Connection refused',
                 timestamp: new Date().toISOString(),
               };
-        this._api
-          .ingest(
-            endpoint.id,
-            endpoint.secret || '',
-            type === 'healthy' ? 'demo.health.check' : 'demo.failure.check',
-            payload,
-            `${type}-${Date.now()}-${crypto.randomUUID()}`,
+        const eventCount = type === 'failing' ? 3 : 1;
+        from(Array.from({ length: eventCount }, (_, index) => index + 1))
+          .pipe(
+            concatMap((sequence) =>
+              this._api.ingest(
+                endpoint.id,
+                endpoint.secret || '',
+                type === 'healthy' ? 'demo.health.check' : 'demo.failure.check',
+                { ...payload, sequence },
+                `${type}-${Date.now()}-${sequence}-${crypto.randomUUID()}`,
+              ),
+            ),
           )
           .subscribe({
-            next: () => {
+            complete: () => {
               if (isCurrentSelection()) this.loadAll();
             },
             error: (error: unknown) => {

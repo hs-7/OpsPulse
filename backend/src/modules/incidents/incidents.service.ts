@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { parseInput } from "../../common/validation/parse-input";
 import { DRIZZLE } from "../../database/database.module";
@@ -103,6 +103,20 @@ export class IncidentsService {
         responseStatus: schema.webhookDeliveries.responseStatus,
       })
       .from(schema.webhookDeliveries)
+      .innerJoin(
+        schema.webhookEvents,
+        eq(schema.webhookDeliveries.eventId, schema.webhookEvents.id),
+      )
+      .innerJoin(
+        schema.webhookEndpoints,
+        eq(schema.webhookEvents.endpointId, schema.webhookEndpoints.id),
+      )
+      .innerJoin(
+        schema.projects,
+        eq(schema.webhookEndpoints.projectId, schema.projects.id),
+      )
+      .where(eq(schema.projects.organizationId, incident.organizationId))
+      .orderBy(desc(schema.webhookEvents.receivedAt))
       .limit(20);
     return this.ai.summarize({
       organizationId,
