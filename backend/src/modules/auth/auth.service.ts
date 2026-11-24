@@ -1,27 +1,25 @@
 import {
-  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
-import * as bcrypt from "bcryptjs";
-import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { and, eq, isNull } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { parseInput } from "../../common/validation/parse-input";
 import { DRIZZLE } from "../../database/database.module";
 import * as schema from "../../database/schema";
 import { loginSchema, registerSchema } from "./auth.schemas";
+import { PASSWORD_HASHER, PasswordHasher } from "./password-hasher";
 
 @Injectable()
 export class AuthService {
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
     @Inject(JwtService) private readonly jwt: JwtService,
-    @Inject(ConfigService) private readonly config: ConfigService,
+    @Inject(PASSWORD_HASHER) private readonly passwordHasher: PasswordHasher,
   ) {}
 
   status() {
@@ -38,7 +36,7 @@ export class AuthService {
     if (existing.length)
       throw new ConflictException("Email already registered");
 
-    const passwordHash = await bcrypt.hash(data.password, 12);
+    const passwordHash = await this.passwordHasher.hash(data.password);
     const created = await this.db.transaction(async (tx) => {
       const [user] = await tx
         .insert(schema.users)
@@ -74,7 +72,7 @@ export class AuthService {
       .limit(1);
     if (
       !users.length ||
-      !(await bcrypt.compare(data.password, users[0].passwordHash))
+      !(await this.passwordHasher.verify(users[0].passwordHash, data.password))
     ) {
       throw new UnauthorizedException("Invalid email or password");
     }
@@ -86,64 +84,142 @@ export class AuthService {
       throw new UnauthorizedException("Refresh token required");
     }
     const tokenHash = this.hashRefreshToken(refreshToken);
-    const sessions = await this.db
-      .select()
-      .from(schema.refreshSessions)
-      .where(
-        and(
-          eq(schema.refreshSessions.tokenHash, tokenHash),
-          isNull(schema.refreshSessions.revokedAt),
-          gt(schema.refreshSessions.expiresAt, new Date()),
-        ),
-      )
-      .limit(1);
-    if (!sessions.length)
-      throw new UnauthorizedException("Invalid or revoked refresh token");
+    const outcome = await this.db.transaction(async (tx) => {
+      const [candidate] = await tx
+        .select({ familyId: schema.refreshSessions.familyId })
+        .from(schema.refreshSessions)
+        .where(eq(schema.refreshSessions.tokenHash, tokenHash))
+        .limit(1);
+      if (!candidate) return { type: "invalid" as const };
 
-    const users = await this.db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, sessions[0].userId))
-      .limit(1);
-    if (!users.length) throw new UnauthorizedException("User not found");
+      const [familyLock] = await tx
+        .select({ id: schema.refreshSessions.id })
+        .from(schema.refreshSessions)
+        .where(eq(schema.refreshSessions.id, candidate.familyId))
+        .limit(1)
+        .for("update");
+      if (!familyLock) return { type: "invalid" as const };
+      const [session] = await tx
+        .select()
+        .from(schema.refreshSessions)
+        .where(eq(schema.refreshSessions.tokenHash, tokenHash))
+        .limit(1)
+        .for("update");
+      if (!session) return { type: "invalid" as const };
 
-    await this.db
-      .update(schema.refreshSessions)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(schema.refreshSessions.id, sessions[0].id),
-          isNull(schema.refreshSessions.revokedAt),
-        ),
+      if (session.revokedAt) {
+        await tx
+          .update(schema.refreshSessions)
+          .set({ revokedAt: new Date() })
+          .where(
+            and(
+              eq(schema.refreshSessions.familyId, session.familyId),
+              isNull(schema.refreshSessions.revokedAt),
+            ),
+          );
+        return { type: "reused" as const };
+      }
+      if (session.expiresAt <= new Date())
+        return { type: "invalid" as const };
+
+      const [user] = await tx
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, session.userId))
+        .limit(1);
+      if (!user) return { type: "invalid" as const };
+
+      const rotatedAt = new Date();
+      const nextRefreshToken = randomBytes(48).toString("hex");
+      await tx
+        .update(schema.refreshSessions)
+        .set({ revokedAt: rotatedAt })
+        .where(eq(schema.refreshSessions.id, session.id));
+      await tx.insert(schema.refreshSessions).values({
+        userId: user.id,
+        familyId: session.familyId,
+        tokenHash: this.hashRefreshToken(nextRefreshToken),
+        expiresAt: new Date(rotatedAt.getTime() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      return {
+        type: "rotated" as const,
+        session: this.createAccessSession(user.id, user.email, nextRefreshToken),
+      };
+    });
+
+    if (outcome.type === "reused") {
+      throw new UnauthorizedException(
+        "Refresh token reuse detected; session family revoked",
       );
-    return this.issueSession(users[0].id, users[0].email);
+    }
+    if (outcome.type === "invalid") {
+      throw new UnauthorizedException("Invalid or expired refresh token");
+    }
+    return outcome.session;
   }
 
   async logout(refreshToken: unknown) {
-    if (typeof refreshToken !== "string" || !refreshToken) {
-      throw new BadRequestException("Refresh token required");
+    if (typeof refreshToken === "string" && refreshToken) {
+      await this.db.transaction(async (tx) => {
+        const [candidate] = await tx
+          .select({ familyId: schema.refreshSessions.familyId })
+          .from(schema.refreshSessions)
+          .where(
+            eq(
+              schema.refreshSessions.tokenHash,
+              this.hashRefreshToken(refreshToken),
+            ),
+          )
+          .limit(1);
+        if (candidate) {
+          const [familyLock] = await tx
+            .select({ id: schema.refreshSessions.id })
+            .from(schema.refreshSessions)
+            .where(eq(schema.refreshSessions.id, candidate.familyId))
+            .limit(1)
+            .for("update");
+          if (familyLock) {
+            await tx
+              .update(schema.refreshSessions)
+              .set({ revokedAt: new Date() })
+              .where(
+                and(
+                  eq(schema.refreshSessions.familyId, candidate.familyId),
+                  isNull(schema.refreshSessions.revokedAt),
+                ),
+              );
+          }
+        }
+      });
     }
-    await this.db
-      .update(schema.refreshSessions)
-      .set({ revokedAt: new Date() })
-      .where(
-        eq(
-          schema.refreshSessions.tokenHash,
-          this.hashRefreshToken(refreshToken),
-        ),
-      );
     return { loggedOut: true };
   }
 
   private async issueSession(userId: string, email: string) {
     const accessToken = this.jwt.sign({ sub: userId, email });
     const refreshToken = randomBytes(48).toString("hex");
+    const familyId = randomUUID();
     await this.db.insert(schema.refreshSessions).values({
+      id: familyId,
       userId,
+      familyId,
       tokenHash: this.hashRefreshToken(refreshToken),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
     return { accessToken, refreshToken, expiresIn: 900 };
+  }
+
+  private createAccessSession(
+    userId: string,
+    email: string,
+    refreshToken: string,
+  ) {
+    return {
+      accessToken: this.jwt.sign({ sub: userId, email }),
+      refreshToken,
+      expiresIn: 900,
+    };
   }
 
   private hashRefreshToken(token: string): string {

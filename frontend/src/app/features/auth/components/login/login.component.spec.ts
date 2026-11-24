@@ -5,6 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { of } from 'rxjs';
 import { AuthSession } from '../../../../core/models/api.models';
+import { AuthSessionService } from '../../../../core/services/auth-session.service';
 import { LoginComponent } from './login.component';
 import { AuthApiService } from '../../data-access/auth-api.service';
 
@@ -21,8 +22,7 @@ describe('LoginComponent', () => {
   });
 
   afterEach(() => {
-    localStorage.removeItem('opspulse_access');
-    localStorage.removeItem('opspulse_refresh');
+    TestBed.inject(AuthSessionService).clearSession();
     vi.restoreAllMocks();
   });
 
@@ -33,7 +33,6 @@ describe('LoginComponent', () => {
   it('submits credentials, stores the session, and navigates to the dashboard', () => {
     const session: AuthSession = {
       accessToken: 'access-token',
-      refreshToken: 'refresh-token',
     };
     const api = TestBed.inject(AuthApiService);
     const router = TestBed.inject(Router);
@@ -45,8 +44,8 @@ describe('LoginComponent', () => {
     fixture.componentInstance.submit();
 
     expect(login).toHaveBeenCalledWith('operator@example.com', 'SecurePass123!');
-    expect(localStorage.getItem('opspulse_access')).toBe(session.accessToken);
-    expect(localStorage.getItem('opspulse_refresh')).toBe(session.refreshToken);
+    expect(TestBed.inject(AuthSessionService).accessToken).toBe(session.accessToken);
+    expect(localStorage.getItem('opspulse_refresh')).toBeNull();
     expect(navigateByUrl).toHaveBeenCalledWith('/app/dashboard');
     expect(fixture.componentInstance.loading()).toBe(false);
   });

@@ -6,7 +6,6 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   JWT_SECRET: z.string().min(16),
-  JWT_REFRESH_SECRET: z.string().min(16),
   GEMINI_API_KEY: z.string().optional(),
 });
 

@@ -305,13 +305,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   /** Revokes the refresh session and returns to the login page. */
   public logout(): void {
-    const refreshToken = this._session.refreshToken;
     this._session.clearSession();
-    if (refreshToken) {
-      this._session.revokeSession(refreshToken).subscribe({
-        error: (error: unknown) => console.error('Could not revoke the refresh session.', error),
-      });
-    }
+    this._session.revokeSession().subscribe({
+      error: (error: unknown) => console.error('Could not revoke the refresh session.', error),
+    });
     void this._router.navigateByUrl('/auth/login');
   }
 
@@ -370,7 +367,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           },
         );
         if (response.status === 401) {
-          if (hasRefreshedForUnauthorized || !this._session.refreshToken) {
+          if (hasRefreshedForUnauthorized) {
             this._session.clearSession();
             void this._router.navigateByUrl('/auth/login');
             return;

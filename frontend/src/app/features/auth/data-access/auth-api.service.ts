@@ -25,7 +25,7 @@ export class AuthApiService {
    */
   public login(email: string, password: string): Observable<AuthSession> {
     return this._http
-      .post<ApiEnvelope<AuthSession>>('/auth/login', { email, password })
+      .post<ApiEnvelope<AuthSession>>('/auth/login', { email, password }, { withCredentials: true })
       .pipe(map((response) => response.data));
   }
 
@@ -37,7 +37,11 @@ export class AuthApiService {
    */
   public register(name: string, email: string, password: string): Observable<AuthSession> {
     return this._http
-      .post<ApiEnvelope<AuthSession>>('/auth/register', { name, email, password })
+      .post<ApiEnvelope<AuthSession>>(
+        '/auth/register',
+        { name, email, password },
+        { withCredentials: true },
+      )
       .pipe(map((response) => response.data));
   }
 

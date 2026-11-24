@@ -27,13 +27,12 @@ describe('DashboardComponent', () => {
 
     fixture = TestBed.createComponent(DashboardComponent);
     api = TestBed.inject(DashboardApiService);
-    localStorage.removeItem('opspulse_access');
+    TestBed.inject(AuthSessionService).clearSession();
   });
 
   afterEach(() => {
     fixture.destroy();
-    localStorage.removeItem('opspulse_access');
-    localStorage.removeItem('opspulse_refresh');
+    TestBed.inject(AuthSessionService).clearSession();
     localStorage.removeItem('opspulse_organization');
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -53,7 +52,7 @@ describe('DashboardComponent', () => {
   });
 
   it('displays organization loading failures in the dashboard', () => {
-    localStorage.setItem('opspulse_access', 'test-token');
+    TestBed.inject(AuthSessionService).storeSession({ accessToken: 'test-token' });
     vi.spyOn(api, 'organizations').mockReturnValue(throwError(() => new Error('offline')));
 
     fixture.detectChanges();
@@ -331,13 +330,12 @@ describe('DashboardComponent', () => {
     const session = TestBed.inject(AuthSessionService);
     const router = TestBed.inject(Router);
     const refreshSession = vi.spyOn(session, 'refreshSession').mockImplementation(() => {
-      session.storeSession({ accessToken: 'new-access', refreshToken: 'new-refresh' });
-      return of({ accessToken: 'new-access', refreshToken: 'new-refresh' });
+      session.storeSession({ accessToken: 'new-access' });
+      return of({ accessToken: 'new-access' });
     });
     const navigateByUrl = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
 
-    localStorage.setItem('opspulse_access', 'expired-access');
-    localStorage.setItem('opspulse_refresh', 'current-refresh');
+    session.storeSession({ accessToken: 'expired-access' });
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -358,7 +356,6 @@ describe('DashboardComponent', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(refreshSession).toHaveBeenCalledTimes(1);
     expect(session.accessToken).toBeNull();
-    expect(session.refreshToken).toBeNull();
     expect(navigateByUrl).toHaveBeenCalledWith('/auth/login');
   });
 
@@ -371,7 +368,7 @@ describe('DashboardComponent', () => {
       organizationId: organization.id,
     };
 
-    localStorage.setItem('opspulse_access', 'test-token');
+    TestBed.inject(AuthSessionService).storeSession({ accessToken: 'test-token' });
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((_url, options: RequestInit) =>

@@ -5,6 +5,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RbacGuard } from './rbac.guard';
+import { Argon2idPasswordHasher, PASSWORD_HASHER } from './password-hasher';
 @Module({
   imports: [
     ConfigModule,
@@ -18,7 +19,12 @@ import { RbacGuard } from './rbac.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, RbacGuard],
+  providers: [
+    { provide: PASSWORD_HASHER, useClass: Argon2idPasswordHasher },
+    AuthService,
+    JwtAuthGuard,
+    RbacGuard,
+  ],
   exports: [AuthService, JwtAuthGuard, RbacGuard, JwtModule],
 })
 export class AuthModule {}

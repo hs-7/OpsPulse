@@ -9,7 +9,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const router = inject(Router);
   const token = session.accessToken;
   const isAuthRequest = /\/auth\/(login|register|refresh|logout)(?:$|\?)/.test(request.url);
-  const authenticatedRequest = token
+  const authenticatedRequest = token && !isAuthRequest
     ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
     : request;
 
@@ -19,7 +19,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
         return throwError(() => error);
       }
 
-      if (!session.refreshToken) {
+      if (!session.accessToken) {
         session.clearSession();
         void router.navigateByUrl('/auth/login');
         return throwError(() => error);

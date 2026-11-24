@@ -38,6 +38,17 @@ latency; periodic polling recovers messages after Redis outages or process resta
 - Docs: Swagger at `/api/docs`
 - Observability: OpenTelemetry + structured JSON logging
 
+## Authentication
+
+Passwords use Argon2id. The 15-minute access JWT stays in Angular memory; opaque
+refresh tokens are SHA-256 hashed in PostgreSQL and delivered only in an
+HttpOnly, `SameSite=Lax` cookie (`Secure` in production). Refresh and logout
+require the paired `XSRF-TOKEN` cookie and `X-XSRF-TOKEN` header.
+
+Keep API requests on same-origin relative URLs so Angular's XSRF interceptor
+can attach the header. The development proxy forwards `/auth` to the backend;
+production deployments should use a same-origin reverse proxy as well.
+
 ## Prerequisites
 
 - Docker Desktop

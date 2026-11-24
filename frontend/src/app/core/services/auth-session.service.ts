@@ -1,6 +1,6 @@
-import { HttpBackend, HttpClient } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, finalize, map, shareReplay, tap, throwError } from 'rxjs';
+import { Observable, finalize, map, shareReplay, tap } from 'rxjs';
 import { ApiEnvelope, AuthSession } from '../models/api.models';
 
 @Injectable({ providedIn: 'root' })
@@ -8,28 +8,27 @@ export class AuthSessionService {
   //#region Private properties
 
   private readonly _http: HttpClient;
+  private _accessToken: string | null;
   private _refreshRequest?: Observable<AuthSession>;
 
   //#endregion
 
   /**
    * Creates the session manager.
-   * @param backend HTTP backend used to bypass the auth interceptor for refresh requests.
+   * @param http HTTP client used for cookie-backed session requests.
    */
-  constructor(backend: HttpBackend) {
-    this._http = new HttpClient(backend);
+  constructor(http: HttpClient) {
+    this._http = http;
+    this._accessToken = null;
+    localStorage.removeItem('opspulse_access');
+    localStorage.removeItem('opspulse_refresh');
   }
 
   //#region Public properties
 
-  /** Returns the current access token, if one is stored. */
+  /** Returns the current access token held in memory. */
   get accessToken(): string | null {
-    return localStorage.getItem('opspulse_access');
-  }
-
-  /** Returns the current refresh token, if one is stored. */
-  get refreshToken(): string | null {
-    return localStorage.getItem('opspulse_refresh');
+    return this._accessToken;
   }
 
   //#endregion
@@ -37,37 +36,34 @@ export class AuthSessionService {
   //#region Public methods
 
   /**
-   * Stores the access and refresh tokens for the authenticated session.
+   * Stores the short-lived access token in memory.
    * @param session Session returned by the authentication API.
    */
   storeSession(session: AuthSession): void {
-    localStorage.setItem('opspulse_access', session.accessToken);
-    localStorage.setItem('opspulse_refresh', session.refreshToken);
+    this._accessToken = session.accessToken;
   }
 
-  /** Removes locally stored authentication tokens. */
+  /** Removes the in-memory access token. */
   clearSession(): void {
-    localStorage.removeItem('opspulse_access');
-    localStorage.removeItem('opspulse_refresh');
+    this._accessToken = null;
   }
 
-  /** Revokes a refresh token through the interceptor-free authentication client. */
-  revokeSession(refreshToken: string): Observable<{ loggedOut: boolean }> {
+  /** Revokes the cookie-backed refresh-token family. */
+  revokeSession(): Observable<{ loggedOut: boolean }> {
     return this._http
-      .post<ApiEnvelope<{ loggedOut: boolean }>>('/auth/logout', { refreshToken })
+      .post<ApiEnvelope<{ loggedOut: boolean }>>('/auth/logout', null, {
+        withCredentials: true,
+      })
       .pipe(map((response) => response.data));
   }
 
   /** Rotates the refresh token, sharing any refresh request already in flight. */
   refreshSession(): Observable<AuthSession> {
     if (!this._refreshRequest) {
-      const refreshToken = this.refreshToken;
-      if (!refreshToken) {
-        return throwError(() => new Error('Cannot refresh a session without a refresh token.'));
-      }
-
       this._refreshRequest = this._http
-        .post<ApiEnvelope<AuthSession>>('/auth/refresh', { refreshToken })
+        .post<ApiEnvelope<AuthSession>>('/auth/refresh', null, {
+          withCredentials: true,
+        })
         .pipe(
           map((response) => response.data),
           tap((session) => this.storeSession(session)),

@@ -7,7 +7,6 @@ export interface ApiEnvelope<T> {
 
 export interface AuthSession {
   accessToken: string;
-  refreshToken: string;
   expiresIn?: number;
 }
 

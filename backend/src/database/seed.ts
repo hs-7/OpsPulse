@@ -1,11 +1,11 @@
 import 'reflect-metadata';
 import { config } from 'dotenv';
-import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
 import * as schema from './schema';
+import { Argon2idPasswordHasher } from '../modules/auth/password-hasher';
 
 async function seed(): Promise<void> {
   config();
@@ -13,7 +13,7 @@ async function seed(): Promise<void> {
   const db = drizzle(pool);
 
   try {
-    const passwordHash = await bcrypt.hash('Demo1234!', 12);
+    const passwordHash = await new Argon2idPasswordHasher().hash('Demo1234!');
     let [user] = await db.select().from(schema.users).where(eq(schema.users.email, 'demo@opspulse.dev')).limit(1);
     if (!user) {
       [user] = await db.insert(schema.users).values({
@@ -21,6 +21,11 @@ async function seed(): Promise<void> {
         email: 'demo@opspulse.dev',
         passwordHash,
       }).returning();
+    } else if (!user.passwordHash.startsWith('$argon2id$')) {
+      await db
+        .update(schema.users)
+        .set({ passwordHash })
+        .where(eq(schema.users.id, user.id));
     }
 
     let [organization] = await db

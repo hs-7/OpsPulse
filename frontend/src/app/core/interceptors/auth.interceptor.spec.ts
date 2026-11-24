@@ -1,4 +1,9 @@
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  HttpClient,
+  provideHttpClient,
+  withInterceptors,
+  withXsrfConfiguration,
+} from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
@@ -16,20 +21,28 @@ describe('authInterceptor', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClient(
+          withXsrfConfiguration({
+            cookieName: 'XSRF-TOKEN',
+            headerName: 'X-XSRF-TOKEN',
+          }),
+          withInterceptors([authInterceptor]),
+        ),
         provideHttpClientTesting(),
       ],
     });
+    document.cookie = 'XSRF-TOKEN=test-csrf-token; path=/';
 
     http = TestBed.inject(HttpClient);
     httpTestingController = TestBed.inject(HttpTestingController);
     session = TestBed.inject(AuthSessionService);
-    session.storeSession({ accessToken: 'expired-access', refreshToken: 'current-refresh' });
+    session.storeSession({ accessToken: 'expired-access' });
   });
 
   afterEach(() => {
     httpTestingController.verify();
     session.clearSession();
+    document.cookie = 'XSRF-TOKEN=; Max-Age=0; path=/';
   });
 
   it('shares refresh rotation across concurrent 401 responses and retries with the new token', () => {
@@ -49,10 +62,13 @@ describe('authInterceptor', () => {
     }
 
     const refreshRequest = httpTestingController.expectOne('/auth/refresh');
-    expect(refreshRequest.request.body).toEqual({ refreshToken: 'current-refresh' });
+    expect(refreshRequest.request.body).toBeNull();
+    expect(refreshRequest.request.withCredentials).toBe(true);
+    expect(refreshRequest.request.headers.has('Authorization')).toBe(false);
+    expect(refreshRequest.request.headers.get('X-XSRF-TOKEN')).toBe('test-csrf-token');
     refreshRequest.flush({
       success: true,
-      data: { accessToken: 'new-access', refreshToken: 'rotated-refresh' },
+      data: { accessToken: 'new-access' },
     });
 
     const retriedRequests = httpTestingController.match('/organizations/org-1/projects');
@@ -64,7 +80,6 @@ describe('authInterceptor', () => {
 
     expect(results).toEqual(['loaded', 'loaded']);
     expect(session.accessToken).toBe('new-access');
-    expect(session.refreshToken).toBe('rotated-refresh');
   });
 
   it('keeps the session when a retried request fails for a non-auth reason', () => {
@@ -81,7 +96,7 @@ describe('authInterceptor', () => {
       .flush({ success: false, data: '' }, { status: 401, statusText: 'Unauthorized' });
     httpTestingController.expectOne('/auth/refresh').flush({
       success: true,
-      data: { accessToken: 'new-access', refreshToken: 'rotated-refresh' },
+      data: { accessToken: 'new-access' },
     });
     httpTestingController
       .expectOne('/organizations/org-1/projects')
@@ -89,7 +104,6 @@ describe('authInterceptor', () => {
 
     expect(errors[0]).toMatchObject({ status: 500 });
     expect(session.accessToken).toBe('new-access');
-    expect(session.refreshToken).toBe('rotated-refresh');
     expect(navigateByUrl).not.toHaveBeenCalled();
   });
 
@@ -107,7 +121,7 @@ describe('authInterceptor', () => {
       .flush({ success: false, data: '' }, { status: 401, statusText: 'Unauthorized' });
     httpTestingController.expectOne('/auth/refresh').flush({
       success: true,
-      data: { accessToken: 'new-access', refreshToken: 'rotated-refresh' },
+      data: { accessToken: 'new-access' },
     });
     httpTestingController
       .expectOne('/organizations/org-1/projects')
@@ -115,7 +129,6 @@ describe('authInterceptor', () => {
 
     expect(errors[0]).toMatchObject({ status: 401 });
     expect(session.accessToken).toBeNull();
-    expect(session.refreshToken).toBeNull();
     expect(navigateByUrl).toHaveBeenCalledWith('/auth/login');
   });
 });
