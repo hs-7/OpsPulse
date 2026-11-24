@@ -4,10 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  OnModuleDestroy,
-  OnModuleInit,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { and, eq } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Queue } from "bullmq";
@@ -15,30 +12,20 @@ import { randomBytes, timingSafeEqual, createHmac } from "node:crypto";
 import { parseInput } from "../../common/validation/parse-input";
 import { DRIZZLE } from "../../database/database.module";
 import * as schema from "../../database/schema";
+import { OutboxRelayService } from "./outbox-relay.service";
 import { createEndpointSchema, projectIdSchema } from "./webhooks.schemas";
+import { WEBHOOK_DELIVERY_QUEUE } from "./webhook-delivery-queue";
+import { DeliveryJob } from "./webhook-delivery.worker";
 
 @Injectable()
-export class WebhooksService implements OnModuleInit, OnModuleDestroy {
-  private queue!: Queue;
-
+export class WebhooksService {
   constructor(
     @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
-    @Inject(ConfigService) private readonly config: ConfigService,
+    @Inject(WEBHOOK_DELIVERY_QUEUE)
+    private readonly queue: Queue<DeliveryJob>,
+    @Inject(OutboxRelayService)
+    private readonly outboxRelay: OutboxRelayService,
   ) {}
-
-  onModuleInit() {
-    this.queue = new Queue("webhook-deliveries", {
-      connection: { url: this.config.getOrThrow<string>("REDIS_URL") },
-      defaultJobOptions: {
-        attempts: 5,
-        backoff: { type: "exponential", delay: 1000 },
-      },
-    });
-  }
-
-  async onModuleDestroy() {
-    await this.queue?.close();
-  }
 
   async create(organizationId: string, input: unknown) {
     const data = parseInput(createEndpointSchema, input);
@@ -183,15 +170,6 @@ export class WebhooksService implements OnModuleInit, OnModuleDestroy {
             idempotencyKey: idempotencyKey.trim(),
           })
           .returning();
-        await tx.insert(schema.outboxMessages).values({
-          eventType: "webhook.event.received",
-          payload: {
-            eventId: event.id,
-            endpointId,
-            idempotencyKey: idempotencyKey.trim(),
-            event,
-          },
-        });
         const [delivery] = await tx
           .insert(schema.webhookDeliveries)
           .values({
@@ -200,6 +178,14 @@ export class WebhooksService implements OnModuleInit, OnModuleDestroy {
             status: "pending",
           })
           .returning();
+        await tx.insert(schema.outboxMessages).values({
+          eventType: "webhook.event.received",
+          payload: {
+            eventId: event.id,
+            endpointId,
+            deliveryId: delivery.id,
+          },
+        });
         return { event, delivery };
       });
     } catch (error) {
@@ -219,19 +205,7 @@ export class WebhooksService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
 
-    await this.queue.add(
-      "deliver",
-      {
-        deliveryId: result.delivery.id,
-        eventId: result.event.id,
-        endpointId,
-      },
-      {
-        jobId: `delivery-${result.delivery.id}`,
-        attempts: 5,
-        backoff: { type: "exponential", delay: 1000 },
-      },
-    );
+    this.outboxRelay.notify();
 
     return {
       accepted: true,

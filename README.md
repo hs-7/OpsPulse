@@ -9,8 +9,10 @@ flowchart LR
   Browser[Angular Dashboard] -->|JWT / HTTP| API[NestJS API]
   Browser -->|SSE| API
   External[External Webhook Sender] -->|HMAC Signed POST| API
-  API --> Postgres[(PostgreSQL)]
-  API --> Redis[(Redis)]
+  API -->|event + delivery + outbox transaction| Postgres[(PostgreSQL)]
+  Postgres -->|unpublished messages| Relay[Outbox Relay]
+  API -->|delivery replay| Redis[(Redis)]
+  Relay -->|deterministic job IDs| Redis
   Redis --> Queue[BullMQ Webhook Workers]
   Queue --> Destination[Webhook Destination]
   Queue -->|Repeated failures| Incidents[Incident Engine]
@@ -18,6 +20,12 @@ flowchart LR
   API --> Gemini[Gemini API Optional]
   API --> OTLP[OpenTelemetry Collector]
 ```
+
+Webhook ingestion persists its event, delivery record, and outbox message in one
+PostgreSQL transaction. The relay claims pending messages with
+`FOR UPDATE SKIP LOCKED`, publishes BullMQ jobs using stable delivery-based IDs,
+and marks messages as published. An ingestion wake-up reduces normal dispatch
+latency; periodic polling recovers messages after Redis outages or process restarts.
 
 ## Stack
 

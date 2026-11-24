@@ -2,9 +2,16 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { createHmac } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
+import { DRIZZLE } from '../src/database/database.module';
+import * as schema from '../src/database/schema';
+import { OutboxRelayService } from '../src/modules/webhooks/outbox-relay.service';
+import { WEBHOOK_DELIVERY_QUEUE } from '../src/modules/webhooks/webhook-delivery-queue';
+import { DeliveryJob } from '../src/modules/webhooks/webhook-delivery.worker';
+import { Queue } from 'bullmq';
+import { eq } from 'drizzle-orm';
 import { exponentialBackoffMs } from '../src/modules/webhooks/webhook-delivery.worker';
 
 describe('Phase 4 webhook ingestion and delivery', () => {
@@ -196,5 +203,76 @@ describe('Phase 4 webhook ingestion and delivery', () => {
     expect(exponentialBackoffMs(1)).toBe(1000);
     expect(exponentialBackoffMs(2)).toBe(2000);
     expect(exponentialBackoffMs(3)).toBe(4000);
+  });
+
+  it('keeps an outbox event pending when Redis rejects publishing and relays it after recovery', async () => {
+    const relay = app.get(OutboxRelayService);
+    await relay.relayPending();
+
+    const queue = app.get<Queue<DeliveryJob>>(WEBHOOK_DELIVERY_QUEUE);
+    let rejectQueueAdd!: (error: Error) => void;
+    const redisUnavailable =
+      new Promise<Awaited<ReturnType<typeof queue.add>>>((_, reject) => {
+        rejectQueueAdd = reject;
+      });
+    const addSpy = vi.spyOn(queue, 'add').mockReturnValue(redisUnavailable);
+    const body = { test: 'outbox-recovery' };
+    const idempotencyKey = `outbox-recovery-${suffix}`;
+    const signature = createHmac('sha256', secret).update(JSON.stringify(body)).digest('hex');
+    const response = await request(app.getHttpServer())
+      .post(`/api/webhooks/ingest/${endpointId}`)
+      .set('X-Idempotency-Key', idempotencyKey)
+      .set('X-Webhook-Signature', `sha256=${signature}`)
+      .send(body);
+
+    expect(response.status).toBe(201);
+    await vi.waitFor(() => expect(addSpy).toHaveBeenCalledTimes(1));
+
+    const db = app.get(DRIZZLE);
+    const messages = await db
+      .select()
+      .from(schema.outboxMessages)
+      .where(eq(schema.outboxMessages.eventType, 'webhook.event.received'));
+    const outboxMessage = messages.find(
+      (message: { payload: unknown }) =>
+        typeof message.payload === 'object' &&
+        message.payload !== null &&
+        'eventId' in message.payload &&
+        message.payload.eventId === response.body.data.eventId,
+    );
+    expect(outboxMessage).toBeDefined();
+    if (!outboxMessage) throw new Error('Expected the ingestion outbox row to exist.');
+    expect(outboxMessage.publishedAt).toBeNull();
+
+    const deliveries = await db
+      .select({ id: schema.webhookDeliveries.id })
+      .from(schema.webhookDeliveries)
+      .where(eq(schema.webhookDeliveries.eventId, response.body.data.eventId));
+    expect(deliveries).toHaveLength(1);
+
+    rejectQueueAdd(new Error('Redis temporarily unavailable'));
+    await expect(relay.relayPending()).rejects.toThrow('Redis temporarily unavailable');
+    const pending = await db
+      .select({ publishedAt: schema.outboxMessages.publishedAt })
+      .from(schema.outboxMessages)
+      .where(eq(schema.outboxMessages.id, outboxMessage.id))
+      .limit(1);
+    expect(pending[0].publishedAt).toBeNull();
+
+    addSpy.mockRestore();
+    await expect(relay.relayPending()).resolves.toBeGreaterThan(0);
+
+    const published = await db
+      .select({ publishedAt: schema.outboxMessages.publishedAt })
+      .from(schema.outboxMessages)
+      .where(eq(schema.outboxMessages.id, outboxMessage.id))
+      .limit(1);
+    expect(published[0].publishedAt).toBeInstanceOf(Date);
+    const job = await queue.getJob(`delivery-${deliveries[0].id}`);
+    expect(job?.data).toEqual({
+      deliveryId: deliveries[0].id,
+      eventId: response.body.data.eventId,
+      endpointId,
+    });
   });
 });
