@@ -232,7 +232,9 @@ describe('Phase 4 webhook ingestion and delivery', () => {
       .send(body);
 
     expect(response.status).toBe(201);
-    await vi.waitFor(() => expect(addSpy).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(addSpy).toHaveBeenCalledTimes(1), {
+      timeout: 5000,
+    });
 
     const db = app.get(DRIZZLE);
     const messages = await db

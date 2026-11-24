@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -7,6 +8,7 @@ import { ResponseInterceptor } from '../src/common/interceptors/response.interce
 import { DRIZZLE } from '../src/database/database.module';
 import * as schema from '../src/database/schema';
 import { AIInsightsService } from '../src/modules/ai-insights/ai-insights.service';
+import { IncidentsService } from '../src/modules/incidents/incidents.service';
 import { WebhookDeliveryWorker } from '../src/modules/webhooks/webhook-delivery.worker';
 
 describe('Phases 5 and 6 incidents, workflows, notifications, analytics, and AI', () => {
@@ -97,7 +99,7 @@ describe('Phases 5 and 6 incidents, workflows, notifications, analytics, and AI'
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   afterEach(() => {
@@ -204,7 +206,11 @@ describe('Phases 5 and 6 incidents, workflows, notifications, analytics, and AI'
       deliveries.push(await createDelivery(endpointId, `escalation-${suffix}-${index}`, 'dead_letter', 503));
     }
 
-    const worker = app.get(WebhookDeliveryWorker);
+    const worker = new WebhookDeliveryWorker(
+      app.get(DRIZZLE),
+      app.get(ConfigService),
+      app.get(IncidentsService),
+    );
     const finalDelivery = deliveries[0];
     await worker.handleFinalFailure(
       {
